@@ -17,6 +17,9 @@ const envSchema = z.object({
   // v2 de Frankfurter: la v1 solo trae monedas del Banco Central Europeo y no incluye COP.
   FRANKFURTER_BASE_URL: z.url().default("https://api.frankfurter.dev/v2"),
   RATES_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
+  // Peso argentino: dólar MEP desde DolarApi. Cambia durante el día, por eso su caché es más corta.
+  DOLARAPI_BASE_URL: z.url().default("https://dolarapi.com/v1"),
+  ARS_RATES_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
   // Recargas con dinero ficticio (modo demo). Poner en "false" si algún día se maneja dinero real.
   DEMO_DEPOSITS_ENABLED: z.enum(["true", "false"]).default("true"),
   // Opcional: sin él, POST /auth/google responde 503 y el resto de la API funciona igual.

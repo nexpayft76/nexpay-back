@@ -24,6 +24,8 @@ export interface WalletValuation {
   total: number;
   ratesDate: string;
   ratesSource: RatesSource;
+  /** Monedas con saldo que no entraron en el total porque su tasa no está disponible. */
+  missingCurrencies: string[];
 }
 
 export interface WalletView {
@@ -57,8 +59,18 @@ export async function getWallet(userId: string, valuedIn: string): Promise<Walle
   let valuation: WalletValuation | null = null;
   try {
     const snapshot = await getRateSnapshot();
+    // Si la moneda de valorización no tiene tasa, no se puede calcular ningún equivalente.
+    if (snapshot.unavailable.includes(target.currency)) {
+      throw new AppError(503, "RATES_UNAVAILABLE", `La tasa de ${target.currency} no está disponible`);
+    }
+
     let total = 0;
+    const missingCurrencies: string[] = [];
     for (const balance of balances) {
+      if (snapshot.unavailable.includes(balance.currency)) {
+        missingCurrencies.push(balance.currency);
+        continue;
+      }
       const rate = balance.currency === target.currency ? 1 : crossRate(snapshot.table, balance.currency, target.currency);
       balance.valueInTarget = roundTo(Number(balance.amount) * rate, target.decimals);
       total += balance.valueInTarget;
@@ -68,6 +80,7 @@ export async function getWallet(userId: string, valuedIn: string): Promise<Walle
       total: roundTo(total, target.decimals),
       ratesDate: snapshot.table.date,
       ratesSource: snapshot.source,
+      missingCurrencies,
     };
   } catch (err) {
     // Sin tasas (503) la wallet se sigue mostrando, solo que sin valorización.
@@ -78,7 +91,7 @@ export async function getWallet(userId: string, valuedIn: string): Promise<Walle
 }
 
 /** Máximo por recarga ficticia, en la moneda recargada. Evita saldos absurdos en la demo. */
-const DEPOSIT_LIMITS: Record<string, number> = { USD: 10_000, EUR: 10_000, COP: 50_000_000 };
+const DEPOSIT_LIMITS: Record<string, number> = { USD: 10_000, EUR: 10_000, COP: 50_000_000, ARS: 20_000_000 };
 const DEFAULT_DEPOSIT_LIMIT = 10_000;
 
 export interface DepositResult {

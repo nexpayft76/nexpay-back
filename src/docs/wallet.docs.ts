@@ -29,6 +29,9 @@ const WalletSchema = z
         total: z.number().meta({ example: 145.83 }),
         ratesDate: z.string().meta({ example: "2026-09-24" }),
         ratesSource: RatesSourceSchema,
+        missingCurrencies: z
+          .array(z.string())
+          .meta({ description: "Monedas que no entraron en el total por no tener tasa disponible", example: [] }),
       })
       .nullable()
       .meta({ description: "null si las tasas no están disponibles; los saldos se muestran igual" }),
@@ -69,7 +72,7 @@ registry.registerPath({
   summary: "Recargar dinero ficticio (modo demo)",
   description:
     "Suma el monto al saldo y registra un DEPOSIT en el historial, todo en una transacción SQL. " +
-    "Máximo por recarga: 10.000 USD, 10.000 EUR o 50.000.000 COP. Se desactiva con DEMO_DEPOSITS_ENABLED=false.",
+    "Máximo por recarga: 10.000 USD, 10.000 EUR, 50.000.000 COP o 20.000.000 ARS. Se desactiva con DEMO_DEPOSITS_ENABLED=false.",
   security: [{ [bearerAuth.name]: [] }],
   request: { body: { content: { "application/json": { schema: depositSchema } }, required: true } },
   responses: {

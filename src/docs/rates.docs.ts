@@ -16,7 +16,20 @@ const RatesSchema = z
     date: z.string().meta({ description: "Fecha de publicación de las tasas", example: "2026-09-24" }),
     source: RatesSourceSchema,
     fetchedAt: z.string().meta({ example: "2026-09-24T21:00:00.000Z" }),
-    rates: z.record(z.string(), z.number()).meta({ example: { COP: 3273.3, EUR: 0.87695 } }),
+    rates: z.record(z.string(), z.number()).meta({ example: { COP: 3273.3, EUR: 0.87695, ARS: 1415.5 } }),
+    unavailable: z
+      .array(z.string())
+      .meta({ description: "Monedas sin tasa en este momento (su proveedor falló y no hay caché)", example: [] }),
+    providers: z.array(
+      z.object({
+        provider: z.enum(["frankfurter", "dolarapi"]),
+        label: z.string().meta({ example: "DolarApi · dólar MEP (varía en el día)" }),
+        currencies: z.array(z.string()).meta({ example: ["ARS"] }),
+        source: RatesSourceSchema,
+        fetchedAt: z.string().meta({ description: "Cuándo lo pidió NexPay", example: "2026-09-25T17:30:00.000Z" }),
+        publishedAt: z.string().meta({ description: "Cuándo lo publicó el proveedor", example: "2026-09-25T17:28:00.000Z" }),
+      }),
+    ),
   })
   .meta({ id: "Rates" });
 
@@ -38,8 +51,11 @@ registry.registerPath({
   tags: ["Rates"],
   summary: "Tasas de cambio actuales",
   description:
-    "Tasas desde la moneda `base` hacia las demás monedas activas. Fuente: Frankfurter v2, " +
-    "con caché en memoria (1 h por defecto) y fallback a la última tasa conocida si la API falla.",
+    "Tasas desde la moneda `base` hacia las demás monedas activas. Fuentes:\n\n" +
+    "- **Frankfurter v2** (USD, EUR, COP): tasa oficial diaria, caché de 1 h.\n" +
+    "- **DolarApi, dólar MEP** (ARS): varía durante el día, caché de 5 min.\n\n" +
+    "Cada proveedor tiene fallback a su última tasa conocida. Si uno falla sin caché, " +
+    "sus monedas aparecen en `unavailable` y el resto sigue funcionando.",
   request: { query: ratesQuerySchema },
   responses: {
     200: jsonResponse("Tasas de cambio", RatesSchema),

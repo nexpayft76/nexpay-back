@@ -1,17 +1,25 @@
 import { env } from "../config/env";
-import { fetchUsdRates, type UsdRateTable } from "../integrations/frankfurter.client";
+import { fetchArsMepQuote, type ArsQuote } from "../integrations/dolarapi.client";
+import { fetchUsdRates, PIVOT_CURRENCY, type UsdRateTable } from "../integrations/frankfurter.client";
 import { findActiveCurrencies, type CurrencyRow } from "../repositories/currency.repository";
 import { AppError } from "../utils/app-error";
+import { createCachedSource, type CacheSource } from "../utils/cached-source";
 import { roundTo } from "../utils/money";
 
-/** De dónde salieron las tasas: recién pedidas, de la caché vigente, o de la caché vencida porque la API falló. */
-export type RatesSource = "live" | "cache" | "fallback";
+export type RatesSource = CacheSource;
 
-interface CachedRates {
-  table: UsdRateTable;
-  fetchedAt: number;
-  /** Monedas que se pidieron; si cambia el catálogo, la caché deja de servir. */
-  codesKey: string;
+/** Monedas cuya tasa NO sale de Frankfurter. */
+const ARS = "ARS";
+
+export interface ProviderStatus {
+  provider: "frankfurter" | "dolarapi";
+  label: string;
+  currencies: string[];
+  source: RatesSource;
+  /** Cuándo lo pidió NexPay. */
+  fetchedAt: string;
+  /** Cuándo lo publicó el proveedor (fecha diaria en Frankfurter, fecha y hora en DolarApi). */
+  publishedAt: string;
 }
 
 export interface RateSnapshot {
@@ -19,47 +27,85 @@ export interface RateSnapshot {
   source: RatesSource;
   fetchedAt: string;
   currencies: CurrencyRow[];
+  providers: ProviderStatus[];
+  /** Monedas activas sin tasa en este momento (su proveedor falló y no hay caché). */
+  unavailable: string[];
 }
 
 const RATE_DECIMALS = 10; // igual que exchange_rate NUMERIC(24,10) en la tabla transactions
 
-let cache: CachedRates | null = null;
-let inFlight: Promise<UsdRateTable> | null = null;
+const frankfurterCache = createCachedSource<UsdRateTable>("Frankfurter", env.RATES_CACHE_TTL_SECONDS * 1000);
+const arsCache = createCachedSource<ArsQuote>("DolarApi (MEP)", env.ARS_RATES_CACHE_TTL_SECONDS * 1000);
+
+/** El estado combinado es el "peor" de los proveedores: fallback > live > cache. */
+function combineSources(sources: RatesSource[]): RatesSource {
+  if (sources.includes("fallback")) return "fallback";
+  if (sources.includes("live")) return "live";
+  return "cache";
+}
 
 /**
- * Devuelve la tabla de tasas usando caché con TTL y fallback:
- * 1. Si la caché está vigente, la usa sin llamar a la API.
- * 2. Si venció, pide tasas nuevas a Frankfurter (una sola petición aunque lleguen varias a la vez).
- * 3. Si Frankfurter falla, usa la última caché aunque esté vencida.
- * 4. Si no hay nada guardado, responde 503.
+ * Arma una tabla "unidades por 1 USD" combinando proveedores:
+ * - Frankfurter: tasas oficiales diarias (USD, EUR, COP...).
+ * - DolarApi: dólar MEP para ARS, que cambia durante el día.
+ * Si un proveedor falla y no tiene caché, sus monedas quedan en `unavailable` y el resto sigue funcionando.
  */
 export async function getRateSnapshot(): Promise<RateSnapshot> {
   const currencies = await findActiveCurrencies();
   const codes = currencies.map((c) => c.code);
-  const codesKey = codes.join(",");
-  const now = Date.now();
-  const cacheMatches = cache !== null && cache.codesKey === codesKey;
+  const frankfurterCodes = codes.filter((c) => c !== ARS);
 
-  if (cache && cacheMatches && now - cache.fetchedAt < env.RATES_CACHE_TTL_SECONDS * 1000) {
-    return { table: cache.table, source: "cache", fetchedAt: new Date(cache.fetchedAt).toISOString(), currencies };
-  }
+  const rates: Record<string, number> = { [PIVOT_CURRENCY]: 1 };
+  const providers: ProviderStatus[] = [];
+  const unavailable: string[] = [];
+  let date = new Date().toISOString().slice(0, 10);
 
   try {
-    inFlight ??= fetchUsdRates(codes).finally(() => {
-      inFlight = null;
+    const result = await frankfurterCache.get(frankfurterCodes.join(","), () => fetchUsdRates(frankfurterCodes));
+    Object.assign(rates, result.value.rates);
+    date = result.value.date;
+    providers.push({
+      provider: "frankfurter",
+      label: "Frankfurter · tasa oficial diaria",
+      currencies: frankfurterCodes.filter((c) => c !== PIVOT_CURRENCY),
+      source: result.source,
+      fetchedAt: new Date(result.fetchedAt).toISOString(),
+      publishedAt: result.value.date,
     });
-    const table = await inFlight;
-    cache = { table, fetchedAt: Date.now(), codesKey };
-    return { table, source: "live", fetchedAt: new Date(cache.fetchedAt).toISOString(), currencies };
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    if (cache && cacheMatches) {
-      console.warn(`Frankfurter no disponible (${reason}); usando tasas en caché del ${cache.table.date}`);
-      return { table: cache.table, source: "fallback", fetchedAt: new Date(cache.fetchedAt).toISOString(), currencies };
+  } catch {
+    unavailable.push(...frankfurterCodes.filter((c) => c !== PIVOT_CURRENCY));
+  }
+
+  if (codes.includes(ARS)) {
+    try {
+      const result = await arsCache.get(ARS, fetchArsMepQuote);
+      rates[ARS] = result.value.arsPerUsd;
+      providers.push({
+        provider: "dolarapi",
+        label: "DolarApi · dólar MEP (varía en el día)",
+        currencies: [ARS],
+        source: result.source,
+        fetchedAt: new Date(result.fetchedAt).toISOString(),
+        publishedAt: result.value.publishedAt,
+      });
+    } catch {
+      unavailable.push(ARS);
     }
-    console.error(`Frankfurter no disponible y sin caché: ${reason}`);
+  }
+
+  if (providers.length === 0 && codes.some((c) => c !== PIVOT_CURRENCY)) {
     throw new AppError(503, "RATES_UNAVAILABLE", "Las tasas de cambio no están disponibles en este momento");
   }
+
+  const oldestFetch = providers.map((p) => p.fetchedAt).sort()[0] ?? new Date().toISOString();
+  return {
+    table: { date, rates },
+    source: combineSources(providers.map((p) => p.source)),
+    fetchedAt: oldestFetch,
+    currencies,
+    providers,
+    unavailable,
+  };
 }
 
 /** Tasa cruzada: cuántas unidades de `to` vale 1 unidad de `from`, usando USD como pivote. */
@@ -67,7 +113,8 @@ export function crossRate(table: UsdRateTable, from: string, to: string): number
   const fromPerUsd = table.rates[from];
   const toPerUsd = table.rates[to];
   if (fromPerUsd === undefined || toPerUsd === undefined) {
-    throw new AppError(400, "UNSUPPORTED_CURRENCY", `No hay tasa disponible para ${from}/${to}`);
+    const missing = fromPerUsd === undefined ? from : to;
+    throw new AppError(503, "RATES_UNAVAILABLE", `La tasa de ${missing} no está disponible en este momento`);
   }
   return roundTo(toPerUsd / fromPerUsd, RATE_DECIMALS);
 }
@@ -87,10 +134,20 @@ export async function getRates(base: string) {
 
   const rates: Record<string, number> = {};
   for (const { code } of snapshot.currencies) {
-    if (code !== base) rates[code] = crossRate(snapshot.table, base, code);
+    if (code !== base && !snapshot.unavailable.includes(code)) {
+      rates[code] = crossRate(snapshot.table, base, code);
+    }
   }
 
-  return { base, date: snapshot.table.date, source: snapshot.source, fetchedAt: snapshot.fetchedAt, rates };
+  return {
+    base,
+    date: snapshot.table.date,
+    source: snapshot.source,
+    fetchedAt: snapshot.fetchedAt,
+    rates,
+    unavailable: snapshot.unavailable,
+    providers: snapshot.providers,
+  };
 }
 
 export async function convert(from: string, to: string, amount: number) {
@@ -110,8 +167,8 @@ export async function convert(from: string, to: string, amount: number) {
   };
 }
 
-/** Solo para tests: vacía la caché en memoria. */
+/** Solo para tests: vacía las cachés en memoria. */
 export function clearRatesCache(): void {
-  cache = null;
-  inFlight = null;
+  frankfurterCache.clear();
+  arsCache.clear();
 }
