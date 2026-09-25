@@ -23,13 +23,6 @@ async function main(): Promise<void> {
     await pool.query(sql);
     console.log(`✔ ${file} aplicado`);
   }
-
-  const { rows } = await pool.query<{ column_name: string; is_nullable: string }>(
-    `SELECT column_name, is_nullable FROM information_schema.columns
-     WHERE table_name = 'users' ORDER BY ordinal_position`,
-  );
-  console.log("\nColumnas actuales de users:");
-  console.table(rows);
 }
 
 main()
