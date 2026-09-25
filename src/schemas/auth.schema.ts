@@ -36,5 +36,16 @@ export const loginSchema = z
   })
   .meta({ id: "LoginInput" });
 
+export const googleLoginSchema = z
+  .object({
+    idToken: z
+      .string({ error: "El idToken de Google es obligatorio" })
+      .min(1, "El idToken de Google es obligatorio")
+      .max(4096, "El idToken es demasiado largo")
+      .meta({ description: "El `credential` que entrega el botón de Google Identity Services", example: "eyJhbGciOiJSUzI1NiIs..." }),
+  })
+  .meta({ id: "GoogleLoginInput" });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type GoogleLoginInput = z.infer<typeof googleLoginSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

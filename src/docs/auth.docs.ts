@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { loginSchema, registerSchema } from "../schemas/auth.schema";
+import { googleLoginSchema, loginSchema, registerSchema } from "../schemas/auth.schema";
 import { bearerAuth, errorResponse, jsonResponse, registry } from "./registry";
 
 const UserSchema = z
@@ -52,6 +52,32 @@ registry.registerPath({
     400: errorResponse("Datos inválidos (VALIDATION_ERROR)"),
     401: errorResponse("Email o contraseña incorrectos (INVALID_CREDENTIALS)"),
     403: errorResponse("Cuenta suspendida o cerrada (ACCOUNT_DISABLED)"),
+  },
+});
+
+const GoogleAuthResponseSchema = AuthResponseSchema.extend({
+  isNewUser: z.boolean().meta({ description: "true si la cuenta se creó en esta petición", example: false }),
+}).meta({ id: "GoogleAuthResponse" });
+
+registry.registerPath({
+  method: "post",
+  path: "/auth/google",
+  tags: ["Auth"],
+  summary: "Iniciar sesión con Google",
+  description:
+    "Recibe el ID token (`credential`) que entrega el botón de Google en el front y lo verifica con Google " +
+    "(firma, expiración y que sea para nuestro Client ID). Si el usuario no existe, lo crea con su wallet; " +
+    "si existe una cuenta con el mismo email verificado, la vincula. Devuelve el mismo JWT que /auth/login.\n\n" +
+    "No se puede probar desde Swagger: el ID token solo lo genera el botón de Google en el navegador.",
+  request: { body: jsonBody(googleLoginSchema) },
+  responses: {
+    200: jsonResponse("Login correcto (usuario existente)", GoogleAuthResponseSchema),
+    201: jsonResponse("Usuario creado con Google", GoogleAuthResponseSchema),
+    400: errorResponse("Falta el idToken (VALIDATION_ERROR)"),
+    401: errorResponse("Token de Google inválido/expirado o email no verificado (INVALID_GOOGLE_TOKEN / GOOGLE_EMAIL_NOT_VERIFIED)"),
+    403: errorResponse("Cuenta suspendida o cerrada (ACCOUNT_DISABLED)"),
+    409: errorResponse("El email ya está vinculado a otra cuenta de Google (EMAIL_LINKED_TO_OTHER_GOOGLE)"),
+    503: errorResponse("GOOGLE_CLIENT_ID no configurado en el servidor (GOOGLE_AUTH_DISABLED)"),
   },
 });
 
