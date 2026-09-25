@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { createWallet, deleteWallet, getWallet, getWalletByUser, listWallets } from "./wallets.controller";
+import { validateCreateWallet, validateUserId, validateWalletId } from "./wallets.middlewares";
 
 export const walletsRouter = Router();
 
@@ -10,6 +11,15 @@ export const walletsRouter = Router();
  *   get:
  *     summary: Obtener wallets
  *     tags: [Wallets]
+ *     responses:
+ *       200:
+ *         description: Lista de wallets
+ */
+walletsRouter.get("/", listWallets);
+
+/**
+ * @openapi
+ * /api/wallets:
  *   post:
  *     summary: Crear wallet
  *     tags: [Wallets]
@@ -23,9 +33,12 @@ export const walletsRouter = Router();
  *             properties:
  *               user_id:
  *                 type: string
+ *                 example: 123e4567-e89b-12d3-a456-426614174000
+ *     responses:
+ *       201:
+ *         description: Wallet creada
  */
-walletsRouter.get("/", listWallets);
-walletsRouter.post("/", createWallet);
+walletsRouter.post("/", validateCreateWallet, createWallet);
 
 /**
  * @openapi
@@ -39,6 +52,17 @@ walletsRouter.post("/", createWallet);
  *         required: true
  *         schema:
  *           type: string
+ *         example: 123e4567-e89b-12d3-a456-426614174000
+ *     responses:
+ *       200:
+ *         description: Wallet del usuario
+ *       404:
+ *         description: Wallet no encontrada
+ */
+walletsRouter.get("/user/:userId", validateUserId, getWalletByUser);
+
+/**
+ * @openapi
  * /api/wallets/{id}:
  *   get:
  *     summary: Obtener wallet por id
@@ -49,6 +73,12 @@ walletsRouter.post("/", createWallet);
  *         required: true
  *         schema:
  *           type: string
+ *         example: 123e4567-e89b-12d3-a456-426614174000
+ *     responses:
+ *       200:
+ *         description: Wallet encontrada
+ *       404:
+ *         description: Wallet no encontrada
  *   delete:
  *     summary: Eliminar wallet
  *     tags: [Wallets]
@@ -58,7 +88,12 @@ walletsRouter.post("/", createWallet);
  *         required: true
  *         schema:
  *           type: string
+ *         example: 123e4567-e89b-12d3-a456-426614174000
+ *     responses:
+ *       204:
+ *         description: Wallet eliminada
+ *       404:
+ *         description: Wallet no encontrada
  */
-walletsRouter.get("/user/:userId", getWalletByUser);
-walletsRouter.get("/:id", getWallet);
-walletsRouter.delete("/:id", deleteWallet);
+walletsRouter.get("/:id", validateWalletId, getWallet);
+walletsRouter.delete("/:id", validateWalletId, deleteWallet);

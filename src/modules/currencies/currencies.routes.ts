@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { createCurrency, deleteCurrency, getCurrency, listCurrencies, updateCurrency } from "./currencies.controller";
+import { validateCreateCurrency, validateCurrencyCode, validateUpdateCurrency } from "./currencies.middlewares";
 
 export const currenciesRouter = Router();
 
@@ -10,6 +11,15 @@ export const currenciesRouter = Router();
  *   get:
  *     summary: Listar monedas activas
  *     tags: [Currencies]
+ *     responses:
+ *       200:
+ *         description: Lista de monedas
+ */
+currenciesRouter.get("/", listCurrencies);
+
+/**
+ * @openapi
+ * /api/currencies:
  *   post:
  *     summary: Crear moneda
  *     tags: [Currencies]
@@ -23,15 +33,20 @@ export const currenciesRouter = Router();
  *             properties:
  *               code:
  *                 type: string
+ *                 example: USD
  *               name:
  *                 type: string
+ *                 example: Dólar estadounidense
  *               decimals:
  *                 type: integer
+ *                 example: 2
  *               is_active:
  *                 type: boolean
+ *     responses:
+ *       201:
+ *         description: Moneda creada
  */
-currenciesRouter.get("/", listCurrencies);
-currenciesRouter.post("/", createCurrency);
+currenciesRouter.post("/", validateCreateCurrency, createCurrency);
 
 /**
  * @openapi
@@ -45,13 +60,39 @@ currenciesRouter.post("/", createCurrency);
  *         required: true
  *         schema:
  *           type: string
+ *         example: USD
+ *     responses:
+ *       200:
+ *         description: Moneda encontrada
+ *       404:
+ *         description: Moneda no encontrada
  *   patch:
  *     summary: Actualizar moneda
  *     tags: [Currencies]
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: USD
+ *     responses:
+ *       200:
+ *         description: Moneda actualizada
  *   delete:
  *     summary: Desactivar moneda
  *     tags: [Currencies]
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: USD
+ *     responses:
+ *       204:
+ *         description: Moneda desactivada
  */
-currenciesRouter.get("/:code", getCurrency);
-currenciesRouter.patch("/:code", updateCurrency);
-currenciesRouter.delete("/:code", deleteCurrency);
+currenciesRouter.get("/:code", validateCurrencyCode, getCurrency);
+currenciesRouter.patch("/:code", validateCurrencyCode, validateUpdateCurrency, updateCurrency);
+currenciesRouter.delete("/:code", validateCurrencyCode, deleteCurrency);
