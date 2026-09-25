@@ -17,6 +17,8 @@ const envSchema = z.object({
   // v2 de Frankfurter: la v1 solo trae monedas del Banco Central Europeo y no incluye COP.
   FRANKFURTER_BASE_URL: z.url().default("https://api.frankfurter.dev/v2"),
   RATES_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
+  // Recargas con dinero ficticio (modo demo). Poner en "false" si algún día se maneja dinero real.
+  DEMO_DEPOSITS_ENABLED: z.enum(["true", "false"]).default("true"),
   // Opcional: sin él, POST /auth/google responde 503 y el resto de la API funciona igual.
   GOOGLE_CLIENT_ID: z.string().endsWith(".apps.googleusercontent.com", "GOOGLE_CLIENT_ID no tiene el formato esperado").optional(),
 });
@@ -45,6 +47,7 @@ export const env = {
   ...data,
   jwtExpiresInSeconds: durationToSeconds(data.JWT_EXPIRES_IN),
   isProduction: data.NODE_ENV === "production",
+  demoDepositsEnabled: data.DEMO_DEPOSITS_ENABLED === "true",
   // SSL explícito si se define DB_SSL; si no, activo solo en producción.
   dbSsl: data.DB_SSL ? data.DB_SSL === "true" : data.NODE_ENV === "production",
   // Permite varios orígenes separados por coma (ej. dominio de Vercel + localhost).

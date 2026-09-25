@@ -1,4 +1,9 @@
-import { findBalancesByWalletId, findWalletByUserId } from "../repositories/wallet.repository";
+import { withTransaction } from "../config/db";
+import { env } from "../config/env";
+import { findActiveCurrency } from "../repositories/currency.repository";
+import { insertDeposit } from "../repositories/transaction.repository";
+import { creditBalance, findBalancesByWalletId, findWalletByUserId } from "../repositories/wallet.repository";
+import type { DepositInput } from "../schemas/wallet.schema";
 import { AppError } from "../utils/app-error";
 import { roundTo } from "../utils/money";
 import { crossRate, getRateSnapshot, type RatesSource } from "./rates.service";
@@ -70,4 +75,63 @@ export async function getWallet(userId: string, valuedIn: string): Promise<Walle
   }
 
   return { walletId: wallet.id, createdAt: wallet.created_at.toISOString(), balances, valuation };
+}
+
+/** Máximo por recarga ficticia, en la moneda recargada. Evita saldos absurdos en la demo. */
+const DEPOSIT_LIMITS: Record<string, number> = { USD: 10_000, EUR: 10_000, COP: 50_000_000 };
+const DEFAULT_DEPOSIT_LIMIT = 10_000;
+
+export interface DepositResult {
+  transactionId: string;
+  type: "DEPOSIT";
+  currency: string;
+  amount: string;
+  newBalance: string;
+  createdAt: string;
+}
+
+function hasAtMostDecimals(value: number, decimals: number): boolean {
+  const scaled = value * 10 ** decimals;
+  return Math.abs(scaled - Math.round(scaled)) < 1e-6;
+}
+
+/**
+ * Recarga con dinero ficticio (modo demo). En una sola transacción SQL:
+ * suma el monto al balance y registra un DEPOSIT en el historial.
+ */
+export async function deposit(userId: string, input: DepositInput): Promise<DepositResult> {
+  if (!env.demoDepositsEnabled) {
+    throw new AppError(403, "DEPOSITS_DISABLED", "Las recargas de prueba están desactivadas");
+  }
+
+  const currency = await findActiveCurrency(input.currency);
+  if (!currency) {
+    throw new AppError(400, "UNSUPPORTED_CURRENCY", `Moneda no soportada: ${input.currency}`);
+  }
+  if (!hasAtMostDecimals(input.amount, currency.decimals)) {
+    throw new AppError(400, "INVALID_AMOUNT", `El monto admite como máximo ${currency.decimals} decimales`);
+  }
+  const limit = DEPOSIT_LIMITS[currency.code] ?? DEFAULT_DEPOSIT_LIMIT;
+  if (input.amount > limit) {
+    throw new AppError(400, "DEPOSIT_LIMIT_EXCEEDED", `El máximo por recarga es ${limit} ${currency.code}`);
+  }
+
+  const amount = input.amount.toFixed(currency.decimals);
+
+  return withTransaction(async (client) => {
+    const wallet = await findWalletByUserId(userId, client);
+    if (!wallet) throw new AppError(404, "WALLET_NOT_FOUND", "El usuario no tiene una wallet");
+
+    const newBalance = await creditBalance(client, wallet.id, currency.code, amount);
+    const tx = await insertDeposit(client, { walletId: wallet.id, currencyCode: currency.code, amount });
+
+    return {
+      transactionId: tx.id,
+      type: "DEPOSIT",
+      currency: currency.code,
+      amount,
+      newBalance,
+      createdAt: tx.created_at.toISOString(),
+    };
+  });
 }

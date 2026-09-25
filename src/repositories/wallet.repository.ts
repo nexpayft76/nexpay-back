@@ -19,6 +19,31 @@ export async function findWalletByUserId(userId: string, db: Queryable = pool): 
   return rows[0] ?? null;
 }
 
+/**
+ * Suma `amount` al saldo de una moneda y devuelve el saldo nuevo.
+ * `amount` va como string para que PostgreSQL haga la suma en NUMERIC exacto (sin errores de float).
+ * El UPDATE bloquea la fila hasta el COMMIT, así dos recargas simultáneas no se pisan.
+ * Si la wallet aún no tiene balance en esa moneda (moneda agregada después), lo crea.
+ */
+export async function creditBalance(
+  db: Queryable,
+  walletId: string,
+  currencyCode: string,
+  amount: string,
+): Promise<string> {
+  const { rows } = await db.query<{ amount: string }>(
+    `INSERT INTO balances (wallet_id, currency_code, amount)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (wallet_id, currency_code)
+     DO UPDATE SET amount = balances.amount + EXCLUDED.amount
+     RETURNING amount`,
+    [walletId, currencyCode, amount],
+  );
+  const balance = rows[0];
+  if (!balance) throw new Error("No se pudo actualizar el balance");
+  return balance.amount;
+}
+
 export async function findBalancesByWalletId(walletId: string, db: Queryable = pool): Promise<BalanceRow[]> {
   const { rows } = await db.query<BalanceRow>(
     `SELECT b.currency_code, c.name AS currency_name, c.decimals, b.amount, b.updated_at

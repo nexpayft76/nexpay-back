@@ -6,6 +6,14 @@ export interface CurrencyRow {
   decimals: number;
 }
 
+export async function findActiveCurrency(code: string, db: Queryable = pool): Promise<CurrencyRow | null> {
+  const { rows } = await db.query<CurrencyRow>(
+    "SELECT code, name, decimals FROM currencies WHERE code = $1 AND is_active = TRUE",
+    [code],
+  );
+  return rows[0] ?? null;
+}
+
 export async function findActiveCurrencies(db: Queryable = pool): Promise<CurrencyRow[]> {
   const { rows } = await db.query<CurrencyRow>(
     "SELECT code, name, decimals FROM currencies WHERE is_active = TRUE ORDER BY code",
