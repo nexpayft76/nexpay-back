@@ -1,15 +1,9 @@
 import type { Request, Response } from "express";
+import { getAuth } from "../middlewares/auth.middleware";
 import { findUserById } from "../repositories/user.repository";
 import type { LoginInput, RegisterInput } from "../schemas/auth.schema";
 import * as authService from "../services/auth.service";
-import type { AuthContext } from "../types/auth";
 import { AppError } from "../utils/app-error";
-
-/** Solo para rutas detrás de `requireAuth`, que garantiza que `req.auth` existe. */
-function getAuth(req: Request): AuthContext {
-  if (!req.auth) throw new AppError(401, "UNAUTHORIZED", "No autenticado");
-  return req.auth;
-}
 
 export async function register(req: Request, res: Response): Promise<void> {
   const result = await authService.register(req.body as RegisterInput);

@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { findUserById } from "../repositories/user.repository";
 import { isTokenRevoked } from "../services/token-blacklist.service";
+import type { AuthContext } from "../types/auth";
 import { AppError } from "../utils/app-error";
 
 function unauthorized(message: string): AppError {
@@ -38,4 +39,10 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
   req.auth = { userId: sub, jti, exp };
   next();
+}
+
+/** Para controladores detrás de `requireAuth`, que garantiza que `req.auth` existe. */
+export function getAuth(req: Request): AuthContext {
+  if (!req.auth) throw unauthorized("No autenticado");
+  return req.auth;
 }

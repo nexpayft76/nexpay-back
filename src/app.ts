@@ -6,6 +6,8 @@ import { openApiDocument } from "./docs/openapi";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
 import { authRouter } from "./routes/auth.routes";
 import { healthRouter } from "./routes/health.routes";
+import { ratesRouter } from "./routes/rates.routes";
+import { walletRouter } from "./routes/wallet.routes";
 
 export const app = express();
 
@@ -25,6 +27,8 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument, {
 }));
 app.use("/health", healthRouter);
 app.use("/auth", authRouter);
+app.use("/wallet", walletRouter);
+app.use("/rates", ratesRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

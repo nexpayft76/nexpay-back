@@ -14,6 +14,9 @@ const envSchema = z.object({
     .regex(/^\d+[smhd]$/, "JWT_EXPIRES_IN debe tener el formato <número><s|m|h|d>, ej. 1h")
     .default("1h"),
   FRONTEND_URL: z.string().min(1, "FRONTEND_URL es obligatoria"),
+  // v2 de Frankfurter: la v1 solo trae monedas del Banco Central Europeo y no incluye COP.
+  FRANKFURTER_BASE_URL: z.url().default("https://api.frankfurter.dev/v2"),
+  RATES_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
 });
 
 const parsed = envSchema.safeParse(process.env);

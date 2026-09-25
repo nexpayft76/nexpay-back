@@ -4,6 +4,8 @@ import { registry } from "./registry";
 // Cada archivo *.docs.ts registra sus endpoints al importarse.
 import "./health.docs";
 import "./auth.docs";
+import "./wallet.docs";
+import "./rates.docs";
 
 export const openApiDocument = new OpenApiGeneratorV3(registry.definitions).generateDocument({
   openapi: "3.0.3",
@@ -17,5 +19,7 @@ export const openApiDocument = new OpenApiGeneratorV3(registry.definitions).gene
   tags: [
     { name: "Health", description: "Estado del servicio" },
     { name: "Auth", description: "Registro, login, logout y usuario actual" },
+    { name: "Wallet", description: "Saldos del usuario autenticado" },
+    { name: "Rates", description: "Tasas de cambio (Frankfurter) con caché y fallback" },
   ],
 });
