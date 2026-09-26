@@ -1,6 +1,6 @@
 import cors from "cors";
 import express from "express";
-import { env } from "./config/env";
+import { corsOptions } from "./config/cors";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
 import { authRouter } from "./modules/auth/auth.routes";
 import { healthRouter } from "./routes/health.routes";
@@ -8,7 +8,7 @@ import { healthRouter } from "./routes/health.routes";
 export const app = express();
 
 app.disable("x-powered-by");
-app.use(cors({ origin: env.corsOrigins, credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/", (_req, res) => {

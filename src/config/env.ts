@@ -42,6 +42,6 @@ export const env = {
   isProduction: data.NODE_ENV === "production",
   // SSL explícito si se define DB_SSL; si no, activo solo en producción.
   dbSsl: data.DB_SSL ? data.DB_SSL === "true" : data.NODE_ENV === "production",
-  // Permite varios orígenes separados por coma (ej. dominio de Vercel + localhost).
+  // Varios orígenes separados por coma; admite "*" para previews (ver src/config/cors.ts).
   corsOrigins: data.FRONTEND_URL.split(",").map((origin) => origin.trim().replace(/\/$/, "")),
 };
