@@ -66,8 +66,4 @@ export const balancesRepository = {
     return rows[0] ?? null;
   },
 
-  async remove(id: string): Promise<boolean> {
-    const { rowCount } = await pool.query("DELETE FROM balances WHERE id = $1", [id]);
-    return (rowCount ?? 0) > 0;
-  },
 };

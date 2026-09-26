@@ -19,11 +19,6 @@ export async function getUser(req: Request, res: Response): Promise<void> {
   res.status(200).json({ data: user });
 }
 
-export async function createUser(req: Request, res: Response): Promise<void> {
-  const user = await usersService.createUser(req.body);
-  res.status(201).json({ data: user });
-}
-
 export async function updateUser(req: Request, res: Response): Promise<void> {
   const id = String(req.params.id);
   const user = await usersService.updateUser(id, req.body);

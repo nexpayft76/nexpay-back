@@ -4,51 +4,33 @@ export interface UserRecord {
   id: string;
   full_name: string;
   email: string;
-  password_hash: string;
-  status: "active" | "inactive" | "closed";
+  status: "active" | "suspended" | "closed";
   created_at: string;
   updated_at: string;
-  deleted_at: string | null;
-}
-
-export interface CreateUserInput {
-  full_name: string;
-  email: string;
-  password_hash: string;
-  status?: "active" | "inactive" | "closed";
 }
 
 export interface UpdateUserInput {
   full_name?: string;
   email?: string;
-  password_hash?: string;
-  status?: "active" | "inactive" | "closed";
+  status?: "active" | "suspended" | "closed";
 }
 
 export const usersRepository = {
   async findAll(): Promise<UserRecord[]> {
     const { rows } = await pool.query<UserRecord>(
-      `SELECT * FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC`,
+      `SELECT id, full_name, email, status, created_at, updated_at
+       FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC`,
     );
     return rows;
   },
 
   async findById(id: string): Promise<UserRecord | null> {
     const { rows } = await pool.query<UserRecord>(
-      `SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      `SELECT id, full_name, email, status, created_at, updated_at
+       FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [id],
     );
     return rows[0] ?? null;
-  },
-
-  async create(input: CreateUserInput): Promise<UserRecord> {
-    const { rows } = await pool.query<UserRecord>(
-      `INSERT INTO users (full_name, email, password_hash, status)
-       VALUES ($1, $2, $3, COALESCE($4, 'active'))
-       RETURNING *`,
-      [input.full_name, input.email, input.password_hash, input.status ?? "active"],
-    );
-    return rows[0];
   },
 
   async update(id: string, input: UpdateUserInput): Promise<UserRecord | null> {
@@ -65,12 +47,6 @@ export const usersRepository = {
     if (input.email !== undefined) {
       fields.push(`email = $${index}`);
       values.push(input.email);
-      index += 1;
-    }
-
-    if (input.password_hash !== undefined) {
-      fields.push(`password_hash = $${index}`);
-      values.push(input.password_hash);
       index += 1;
     }
 
@@ -91,7 +67,7 @@ export const usersRepository = {
       `UPDATE users
        SET ${fields.join(", ")}
        WHERE id = $${index} AND deleted_at IS NULL
-       RETURNING *`,
+      RETURNING id, full_name, email, status, created_at, updated_at`,
       values,
     );
 

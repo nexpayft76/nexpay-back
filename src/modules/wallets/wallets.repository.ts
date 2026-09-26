@@ -42,8 +42,4 @@ export const walletsRepository = {
     return rows[0];
   },
 
-  async remove(id: string): Promise<boolean> {
-    const { rowCount } = await pool.query("DELETE FROM wallets WHERE id = $1", [id]);
-    return (rowCount ?? 0) > 0;
-  },
 };

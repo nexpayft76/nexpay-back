@@ -36,14 +36,3 @@ export async function createWallet(req: Request, res: Response): Promise<void> {
   res.status(201).json({ data: wallet });
 }
 
-export async function deleteWallet(req: Request, res: Response): Promise<void> {
-  const id = String(req.params.id);
-  const deleted = await walletsService.deleteWallet(id);
-
-  if (!deleted) {
-    res.status(404).json({ error: "WALLET_NOT_FOUND", message: "Wallet no encontrada" });
-    return;
-  }
-
-  res.status(204).send();
-}

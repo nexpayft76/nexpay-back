@@ -5,5 +5,4 @@ export const walletsService = {
   getWalletById: (id: string) => walletsRepository.findById(id),
   getWalletByUserId: (userId: string) => walletsRepository.findByUserId(userId),
   createWallet: (input: CreateWalletInput) => walletsRepository.create(input),
-  deleteWallet: (id: string) => walletsRepository.remove(id),
 };

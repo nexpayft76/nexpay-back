@@ -1,12 +1,12 @@
 import { pool } from "../../config/db";
 
-export type TransactionType = "BUYSELL_EXCHANGE" | "DEPOSIT" | "WITHDRAWAL" | "TRANSFER";
+export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT";
 
 export interface TransactionRecord {
   id: string;
   wallet_id: string;
   type: TransactionType;
-  from_currency: string;
+  from_currency: string | null;
   to_currency: string;
   from_amount: string;
   to_amount: string;
@@ -17,7 +17,7 @@ export interface TransactionRecord {
 export interface CreateTransactionInput {
   wallet_id: string;
   type: TransactionType;
-  from_currency: string;
+  from_currency: string | null;
   to_currency: string;
   from_amount: string;
   to_amount: string;
@@ -48,8 +48,4 @@ export const transactionsRepository = {
     return rows[0];
   },
 
-  async remove(id: string): Promise<boolean> {
-    const { rowCount } = await pool.query("DELETE FROM transactions WHERE id = $1", [id]);
-    return (rowCount ?? 0) > 0;
-  },
 };

@@ -1,7 +1,7 @@
 import { Router } from "express";
 
-import { createUser, deleteUser, getUser, listUsers, updateUser } from "./users.controller";
-import { validateCreateUser, validateUpdateUser, validateUserId } from "./users.middlewares";
+import { deleteUser, getUser, listUsers, updateUser } from "./users.controller";
+import { validateUpdateUser, validateUserId } from "./users.middlewares";
 
 export const usersRouter = Router();
 
@@ -16,35 +16,6 @@ export const usersRouter = Router();
  *         description: Lista de usuarios
  */
 usersRouter.get("/", listUsers);
-
-/**
- * @openapi
- * /api/users:
- *   post:
- *     summary: Crear un usuario
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [full_name, email, password_hash]
- *             properties:
- *               full_name:
- *                 type: string
- *               email:
- *                 type: string
- *               password_hash:
- *                 type: string
- *               status:
- *                 type: string
- *                 enum: [active, inactive, closed]
- *     responses:
- *       201:
- *         description: Usuario creado
- */
-usersRouter.post("/", validateCreateUser, createUser);
 
 /**
  * @openapi
@@ -91,11 +62,9 @@ usersRouter.get("/:id", validateUserId, getUser);
  *                 type: string
  *               email:
  *                 type: string
- *               password_hash:
- *                 type: string
  *               status:
  *                 type: string
- *                 enum: [active, inactive, closed]
+ *                 enum: [active, suspended, closed]
  *     responses:
  *       200:
  *         description: Usuario actualizado
