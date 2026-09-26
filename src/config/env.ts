@@ -9,7 +9,10 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL es obligatoria"),
   DB_SSL: z.enum(["true", "false"]).optional(),
   JWT_SECRET: z.string().min(32, "JWT_SECRET debe tener al menos 32 caracteres"),
-  JWT_EXPIRES_IN: z.string().default("1h"),
+  JWT_EXPIRES_IN: z
+    .string()
+    .regex(/^\d+[smhd]$/, "JWT_EXPIRES_IN debe tener el formato <número><s|m|h|d>, ej. 1h")
+    .default("1h"),
   FRONTEND_URL: z.string().min(1, "FRONTEND_URL es obligatoria"),
 });
 
@@ -25,8 +28,17 @@ if (!parsed.success) {
 
 const data = parsed.data;
 
+const SECONDS_PER_UNIT = { s: 1, m: 60, h: 3600, d: 86_400 } as const;
+
+/** Convierte "15m", "1h", "7d"... a segundos. El formato ya fue validado por zod. */
+function durationToSeconds(value: string): number {
+  const unit = value.slice(-1) as keyof typeof SECONDS_PER_UNIT;
+  return Number(value.slice(0, -1)) * SECONDS_PER_UNIT[unit];
+}
+
 export const env = {
   ...data,
+  jwtExpiresInSeconds: durationToSeconds(data.JWT_EXPIRES_IN),
   isProduction: data.NODE_ENV === "production",
   // SSL explícito si se define DB_SSL; si no, activo solo en producción.
   dbSsl: data.DB_SSL ? data.DB_SSL === "true" : data.NODE_ENV === "production",
