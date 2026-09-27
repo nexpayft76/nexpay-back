@@ -3,7 +3,7 @@ import { env } from "../../config/env";
 import { AppError } from "../../utils/app-error";
 import { roundTo } from "../../utils/money";
 import { currenciesRepository } from "../currencies/currencies.repository";
-import { crossRate, getRateSnapshot, type RatesSource } from "../rates/rates.service";
+import { getRateSnapshot, quoteRate, type RatesSource } from "../rates/rates.service";
 import { transactionsRepository } from "../transactions/transactions.repository";
 import { walletsRepository } from "./wallets.repository";
 
@@ -106,8 +106,18 @@ export const walletsService = {
           missing.push(balance.currency);
           continue;
         }
-        const rate =
-          balance.currency === target.currency ? 1 : crossRate(snapshot.table, balance.currency, target.currency);
+        // Mismo precio que el cotizador (quoteRate con dólar MEP): recibir ARS = compra, pagar con ARS = venta.
+        // Así el total estimado coincide con lo que el usuario obtendría al convertir en /api/rates/convert.
+        let rate = 1;
+        if (balance.currency !== target.currency) {
+          try {
+            rate = quoteRate(snapshot, balance.currency, target.currency).rate;
+          } catch (err) {
+            if (!(err instanceof AppError) || err.statusCode !== 503) throw err;
+            missing.push(balance.currency);
+            continue;
+          }
+        }
         balance.value_in_target = roundTo(Number(balance.amount) * rate, target.decimals);
         total += balance.value_in_target;
       }
