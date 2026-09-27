@@ -2,9 +2,45 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
 const uuidRegex = /^[0-9a-fA-F-]{36}$/;
-const currencyCodeRegex = /^[A-Z0-9]{3,10}$/;
+const currencyCodeRegex = /^[A-Z0-9]{3,10}$/i;
 
 const transactionTypeSchema = z.enum(["BUY", "SELL", "EXCHANGE", "DEPOSIT"]);
+const positiveAmountSchema = z.string().regex(/^(?=.*[1-9])\d+(\.\d{1,8})?$/, "El monto debe ser mayor que 0 y usar hasta 8 decimales");
+
+const buyCurrencySchema = z.object({
+  wallet_id: z.string().trim().regex(uuidRegex, "El id de la wallet no es válido"),
+  from_currency: z.string().trim().min(3).max(10).regex(currencyCodeRegex, "La moneda origen no es válida").transform((value) => value.toUpperCase()),
+  to_currency: z.string().trim().min(3).max(10).regex(currencyCodeRegex, "La moneda destino no es válida").transform((value) => value.toUpperCase()),
+  from_amount: positiveAmountSchema,
+  exchange_rate: z.string().regex(/^(?=.*[1-9])\d+(\.\d{1,10})?$/, "El tipo de cambio debe ser mayor que 0 y usar hasta 10 decimales"),
+}).strict().superRefine((input, context) => {
+  if (input.from_currency === input.to_currency) {
+    context.addIssue({
+      code: "custom",
+      path: ["to_currency"],
+      message: "La moneda destino debe ser distinta a la moneda origen",
+    });
+  }
+});
+
+export function validateBuyCurrency(req: Request, res: Response, next: NextFunction): void {
+  const result = buyCurrencySchema.safeParse(req.body);
+
+  if (!result.success) {
+    res.status(400).json({
+      error: "INVALID_PURCHASE_PAYLOAD",
+      message: "Datos de compra inválidos",
+      details: result.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
+    return;
+  }
+
+  req.body = result.data;
+  next();
+}
 
 const createTransactionSchema = z.object({
   wallet_id: z.string().trim().regex(uuidRegex, "El id de la wallet no es válido"),
