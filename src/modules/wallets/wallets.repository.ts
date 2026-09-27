@@ -1,4 +1,4 @@
-import { pool } from "../../config/db";
+import { pool, type Queryable } from "../../config/db";
 
 export interface WalletRecord {
   id: string;
@@ -48,5 +48,25 @@ export const walletsRepository = {
       [user_id],
     );
     return rows[0] ?? null;
+  },
+
+  /**
+   * Suma `amount` al saldo de una moneda y devuelve el saldo nuevo (NUMERIC como texto).
+   * `amount` va como texto para que PostgreSQL sume en NUMERIC exacto, sin errores de float.
+   * El UPDATE bloquea la fila hasta el COMMIT: dos recargas simultáneas no se pisan.
+   * Si la wallet no tiene balance en esa moneda (moneda agregada después), lo crea.
+   */
+  async creditBalance(db: Queryable, walletId: string, currencyCode: string, amount: string): Promise<string> {
+    const { rows } = await db.query<{ amount: string }>(
+      `INSERT INTO balances (wallet_id, currency_code, amount)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (wallet_id, currency_code)
+       DO UPDATE SET amount = balances.amount + EXCLUDED.amount
+       RETURNING amount::text AS amount`,
+      [walletId, currencyCode, amount],
+    );
+    const balance = rows[0];
+    if (!balance) throw new Error("No se pudo actualizar el balance");
+    return balance.amount;
   },
 };

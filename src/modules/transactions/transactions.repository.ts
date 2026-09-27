@@ -1,4 +1,4 @@
-import { pool } from "../../config/db";
+import { pool, type Queryable } from "../../config/db";
 
 export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT";
 
@@ -48,4 +48,22 @@ export const transactionsRepository = {
     return rows[0];
   },
 
+  /**
+   * Registra una recarga en el historial, dentro de la transacción SQL de `db`.
+   * Un DEPOSIT no tiene moneda de origen (from_currency NULL, regla de la migración 002) y su tasa es 1.
+   */
+  async insertDeposit(
+    db: Queryable,
+    input: { wallet_id: string; currency_code: string; amount: string },
+  ): Promise<{ id: string; created_at: Date }> {
+    const { rows } = await db.query<{ id: string; created_at: Date }>(
+      `INSERT INTO transactions (wallet_id, type, from_currency, to_currency, from_amount, to_amount, exchange_rate)
+       VALUES ($1, 'DEPOSIT', NULL, $2, $3, $3, 1)
+       RETURNING id, created_at`,
+      [input.wallet_id, input.currency_code, input.amount],
+    );
+    const row = rows[0];
+    if (!row) throw new Error("INSERT INTO transactions no devolvió filas");
+    return row;
+  },
 };
