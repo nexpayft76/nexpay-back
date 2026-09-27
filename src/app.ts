@@ -21,6 +21,7 @@ app.get("/", (_req, res) => {
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/health", healthRouter);
+app.use("/api/auth", authRouter);
 
 app.use("/api/users", usersRouter);
 app.use("/api/wallets", walletsRouter);
