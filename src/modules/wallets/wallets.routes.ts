@@ -1,7 +1,7 @@
 import { Router } from "express";
 
-import { getMyWallet, getWallet, getWalletByUser, listWallets } from "./wallets.controller";
-import { validateUserId, validateWalletId } from "./wallets.middlewares";
+import { depositToMyWallet, getMyWallet, getWallet, getWalletByUser, listWallets } from "./wallets.controller";
+import { validateDeposit, validateUserId, validateWalletId } from "./wallets.middlewares";
 
 export const walletsRouter = Router();
 
@@ -66,6 +66,55 @@ export const walletsRouter = Router();
  */
 // Va antes de "/:id": si no, Express tomaría "me" como un id de wallet.
 walletsRouter.get("/me", getMyWallet);
+
+/**
+ * @openapi
+ * /api/wallets/me/deposits:
+ *   post:
+ *     summary: Recargar dinero ficticio en mi wallet (modo demo)
+ *     description: |
+ *       Suma el monto al saldo de la moneda y registra un DEPOSIT en el historial, todo en una transacción SQL.
+ *       El usuario se toma del token. Máximo por recarga: 50.000.000 COP, 20.000.000 ARS, 10.000 USD, 10.000 EUR.
+ *       Se desactiva con DEMO_DEPOSITS_ENABLED=false.
+ *     tags: [Wallets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currency, amount]
+ *             properties:
+ *               currency: { type: string, example: COP }
+ *               amount: { type: number, description: "Mayor que 0, máximo 2 decimales", example: 1000000 }
+ *     responses:
+ *       201:
+ *         description: Recarga aplicada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     transaction_id: { type: string, format: uuid }
+ *                     type: { type: string, example: DEPOSIT }
+ *                     currency: { type: string, example: COP }
+ *                     amount: { type: string, example: "1000000.00" }
+ *                     new_balance: { type: string, description: "Saldo después de la recarga", example: "1000000.00000000" }
+ *                     created_at: { type: string, format: date-time }
+ *       400:
+ *         description: Datos inválidos, moneda no soportada, más de 2 decimales o límite excedido
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       401:
+ *         description: Token ausente, inválido, expirado o revocado (UNAUTHORIZED)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       403:
+ *         description: Recargas de prueba desactivadas (DEPOSITS_DISABLED)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ */
+walletsRouter.post("/me/deposits", validateDeposit, depositToMyWallet);
 
 /**
  * @openapi

@@ -23,6 +23,8 @@ const envSchema = z.object({
   // Historial para gráficos: ARS desde ArgentinaDatos (mismo autor que DolarApi). Cambia poco: caché de 6 h.
   ARGENTINADATOS_BASE_URL: z.url().default("https://api.argentinadatos.com/v1"),
   HISTORY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(21600),
+  // Recargas con dinero ficticio (modo demo). Poner en "false" si algún día se maneja dinero real.
+  DEMO_DEPOSITS_ENABLED: z.enum(["true", "false"]).default("true"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -49,6 +51,7 @@ export const env = {
   ...data,
   jwtExpiresInSeconds: durationToSeconds(data.JWT_EXPIRES_IN),
   isProduction: data.NODE_ENV === "production",
+  demoDepositsEnabled: data.DEMO_DEPOSITS_ENABLED === "true",
   // SSL explícito si se define DB_SSL; si no, activo solo en producción.
   dbSsl: data.DB_SSL ? data.DB_SSL === "true" : data.NODE_ENV === "production",
   // Varios orígenes separados por coma; admite "*" para previews (ver src/config/cors.ts).

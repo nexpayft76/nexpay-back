@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 
 import { getAuth } from "../auth/auth.middlewares";
 import { parseMyWalletQuery } from "./wallets.middlewares";
-import { walletsService } from "./wallets.service";
+import { walletsService, type DepositInput } from "./wallets.service";
 
 /** La wallet del usuario autenticado: el usuario sale del token, nunca de un id enviado por el cliente. */
 export async function getMyWallet(req: Request, res: Response): Promise<void> {
@@ -40,3 +40,8 @@ export async function getWalletByUser(req: Request, res: Response): Promise<void
   res.status(200).json({ data: wallet });
 }
 
+/** Recarga ficticia en la wallet del usuario autenticado (el usuario sale del token). */
+export async function depositToMyWallet(req: Request, res: Response): Promise<void> {
+  const result = await walletsService.deposit(getAuth(req).userId, req.body as DepositInput);
+  res.status(201).json({ data: result });
+}

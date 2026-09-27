@@ -54,3 +54,31 @@ export function validateUserId(req: Request, res: Response, next: NextFunction):
 
   next();
 }
+
+const depositSchema = z
+  .object({
+    currency: z
+      .string({ error: "La moneda es obligatoria" })
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{3}$/, "La moneda debe ser un código de 3 letras, ej. COP"),
+    amount: z
+      .number({ error: "El monto debe ser un número" })
+      .positive("El monto debe ser mayor que 0"),
+  })
+  .strict();
+
+/** Valida el body de POST /api/wallets/me/deposits. Si falla, responde 400 con el detalle por campo. */
+export function validateDeposit(req: Request, res: Response, next: NextFunction): void {
+  const result = depositSchema.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({
+      error: "INVALID_DEPOSIT_PAYLOAD",
+      message: "Datos de la recarga inválidos",
+      details: result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+    });
+    return;
+  }
+  req.body = result.data;
+  next();
+}
