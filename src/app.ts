@@ -1,7 +1,7 @@
 import cors from "cors";
 import express from "express";
 import swaggerUi from "swagger-ui-express";
-import { env } from "./config/env";
+import { corsOptions } from "./config/cors";
 import { swaggerSpec } from "./config/swagger";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
 import { balancesRouter, currenciesRouter, transactionsRouter, usersRouter, walletsRouter } from "./modules";
@@ -12,7 +12,7 @@ import { healthRouter } from "./routes/health.routes";
 export const app = express();
 
 app.disable("x-powered-by");
-app.use(cors({ origin: env.corsOrigins, credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/", (_req, res) => {
