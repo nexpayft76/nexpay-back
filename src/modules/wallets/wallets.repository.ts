@@ -7,7 +7,29 @@ export interface WalletRecord {
   updated_at: string;
 }
 
+export interface WalletBalanceRecord {
+  currency_code: string;
+  currency_name: string;
+  decimals: number;
+  /** NUMERIC como texto: se mantiene exacto, sin pasar por float. */
+  amount: string;
+  updated_at: Date;
+}
+
 export const walletsRepository = {
+  /** Saldos de una wallet con el nombre y los decimales de cada moneda (solo monedas activas). */
+  async findBalancesWithCurrency(walletId: string): Promise<WalletBalanceRecord[]> {
+    const { rows } = await pool.query<WalletBalanceRecord>(
+      `SELECT b.currency_code, c.name AS currency_name, c.decimals, b.amount::text AS amount, b.updated_at
+       FROM balances b
+       JOIN currencies c ON c.code = b.currency_code AND c.is_active = TRUE
+       WHERE b.wallet_id = $1
+       ORDER BY b.currency_code`,
+      [walletId],
+    );
+    return rows;
+  },
+
   async findAll(): Promise<WalletRecord[]> {
     const { rows } = await pool.query<WalletRecord>(
       "SELECT * FROM wallets ORDER BY created_at DESC",
