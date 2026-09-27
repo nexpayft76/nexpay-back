@@ -10,6 +10,9 @@ export const pool = new Pool({
   connectionTimeoutMillis: 10_000,
 });
 
+/** Acepta tanto el pool como un cliente dentro de una transacción. */
+export type Queryable = Pool | PoolClient;
+
 pool.on("error", (err) => {
   console.error("Error inesperado en un cliente inactivo de PostgreSQL:", err.message);
 });

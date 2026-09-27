@@ -4,7 +4,9 @@ import swaggerUi from "swagger-ui-express";
 import { env } from "./config/env";
 import { swaggerSpec } from "./config/swagger";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
+
 import { balancesRouter, currenciesRouter, transactionsRouter, usersRouter, walletsRouter } from "./modules";
+import { authRouter } from "./modules/auth/auth.routes";
 import { healthRouter } from "./routes/health.routes";
 
 export const app = express();
@@ -19,11 +21,13 @@ app.get("/", (_req, res) => {
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/health", healthRouter);
+
 app.use("/api/users", usersRouter);
 app.use("/api/wallets", walletsRouter);
 app.use("/api/balances", balancesRouter);
 app.use("/api/currencies", currenciesRouter);
 app.use("/api/transactions", transactionsRouter);
+
 
 app.use(notFoundHandler);
 app.use(errorHandler);
