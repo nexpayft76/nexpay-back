@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 
 import { pool, type Queryable } from "../../config/db";
+import { AppError } from "../../utils/app-error";
 
 export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT";
 
@@ -13,7 +14,11 @@ export interface TransactionRecord {
   from_amount: string;
   to_amount: string;
   exchange_rate: string;
-  created_at: string;
+  fee_amount: string;
+  fee_currency: string | null;
+  fee_percent: string;
+  ars_rate_type: string | null;
+  created_at: Date;
 }
 
 export interface CreateTransactionInput {
@@ -26,40 +31,26 @@ export interface CreateTransactionInput {
   exchange_rate: string;
 }
 
-export interface CurrencyPurchaseInput {
+/** Cambio ya calculado por el servicio (tasa del servidor y comisión). Los montos van como texto exacto. */
+export interface ExchangeInput {
   wallet_id: string;
+  type: Exclude<TransactionType, "DEPOSIT">;
   from_currency: string;
   to_currency: string;
+  /** Total que se debita del origen, comisión incluida. */
   from_amount: string;
+  /** Lo que se acredita en el destino. */
+  to_amount: string;
   exchange_rate: string;
+  fee_amount: string;
+  fee_percent: string;
+  ars_rate_type: string | null;
 }
 
-export interface CurrencyPurchaseResult {
+export interface ExchangeRecord {
   transaction: TransactionRecord;
-  balances: {
-    from: BalanceSnapshot;
-    to: BalanceSnapshot;
-  };
-}
-
-interface BalanceSnapshot {
-  id: string;
-  wallet_id: string;
-  currency_code: string;
-  amount: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export class CurrencyPurchaseError extends Error {
-  constructor(
-    readonly statusCode: number,
-    readonly code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = "CurrencyPurchaseError";
-  }
+  /** Saldos después del cambio (NUMERIC como texto). */
+  balances: { from: string; to: string };
 }
 
 export const transactionsRepository = {
@@ -75,85 +66,68 @@ export const transactionsRepository = {
     return rows[0] ?? null;
   },
 
-  async buyCurrency(client: PoolClient, input: CurrencyPurchaseInput): Promise<CurrencyPurchaseResult> {
-    const currencyResult = await client.query<{ code: string; decimals: number }>(
-      `SELECT code, decimals
-       FROM currencies
-       WHERE code = ANY($1::varchar[]) AND is_active = true
-       FOR SHARE`,
-      [[input.from_currency, input.to_currency]],
-    );
-
-    if (currencyResult.rows.length !== 2) {
-      throw new CurrencyPurchaseError(400, "CURRENCY_NOT_AVAILABLE", "Una o ambas monedas no existen o están inactivas");
-    }
-
-    const targetCurrency = currencyResult.rows.find((currency) => currency.code === input.to_currency);
-    if (!targetCurrency) {
-      throw new CurrencyPurchaseError(400, "CURRENCY_NOT_AVAILABLE", "La moneda destino no está disponible");
-    }
-
-    const balanceResult = await client.query<BalanceSnapshot>(
-      `SELECT id, wallet_id, currency_code, amount::text AS amount, created_at, updated_at
-       FROM balances
+  /**
+   * Aplica un cambio de moneda dentro de la transacción SQL de `client` (base: trabajo de Nelson):
+   * bloquea los dos saldos, debita el origen solo si alcanza, acredita el destino y lo registra.
+   * Si algo falla, withTransaction hace ROLLBACK y no queda nada a medias.
+   */
+  async applyExchange(client: PoolClient, input: ExchangeInput): Promise<ExchangeRecord> {
+    // FOR UPDATE: dos operaciones simultáneas sobre la misma wallet esperan su turno (sin saldo negativo).
+    // ORDER BY fijo: siempre se bloquean en el mismo orden, así dos cambios cruzados no se trancan.
+    await client.query(
+      `SELECT id FROM balances
        WHERE wallet_id = $1 AND currency_code = ANY($2::varchar[])
        ORDER BY currency_code
        FOR UPDATE`,
       [input.wallet_id, [input.from_currency, input.to_currency]],
     );
 
-    const sourceBalance = balanceResult.rows.find((balance) => balance.currency_code === input.from_currency);
-    if (!sourceBalance) {
-      throw new CurrencyPurchaseError(409, "INSUFFICIENT_BALANCE", "No tienes saldo disponible en la moneda origen");
-    }
-
-    const amountResult = await client.query<{ amount: string; is_positive: boolean }>(
-      `SELECT round($1::numeric * $2::numeric, LEAST($3::integer, 8))::text AS amount,
-              round($1::numeric * $2::numeric, LEAST($3::integer, 8)) > 0 AS is_positive`,
-      [input.from_amount, input.exchange_rate, targetCurrency.decimals],
-    );
-    const toAmount = amountResult.rows[0].amount;
-
-    if (!amountResult.rows[0].is_positive) {
-      throw new CurrencyPurchaseError(400, "PURCHASE_AMOUNT_TOO_SMALL", "El monto convertido debe ser mayor que 0");
-    }
-
-    const debitResult = await client.query<BalanceSnapshot>(
+    const debit = await client.query<{ amount: string }>(
       `UPDATE balances
-       SET amount = amount - $1::numeric, updated_at = NOW()
-       WHERE id = $2 AND amount >= $1::numeric
-       RETURNING id, wallet_id, currency_code, amount::text AS amount, created_at, updated_at`,
-      [input.from_amount, sourceBalance.id],
+       SET amount = amount - $1::numeric
+       WHERE wallet_id = $2 AND currency_code = $3 AND amount >= $1::numeric
+       RETURNING amount::text AS amount`,
+      [input.from_amount, input.wallet_id, input.from_currency],
     );
-
-    if (!debitResult.rows[0]) {
-      throw new CurrencyPurchaseError(409, "INSUFFICIENT_BALANCE", "El saldo disponible es insuficiente para esta compra");
+    const fromBalance = debit.rows[0];
+    if (!fromBalance) {
+      throw new AppError(409, "INSUFFICIENT_BALANCE", `Saldo insuficiente en ${input.from_currency}`);
     }
 
-    const creditResult = await client.query<BalanceSnapshot>(
+    const credit = await client.query<{ amount: string }>(
       `INSERT INTO balances (wallet_id, currency_code, amount)
        VALUES ($1, $2, $3::numeric)
        ON CONFLICT (wallet_id, currency_code)
-       DO UPDATE SET amount = balances.amount + EXCLUDED.amount, updated_at = NOW()
-       RETURNING id, wallet_id, currency_code, amount::text AS amount, created_at, updated_at`,
-      [input.wallet_id, input.to_currency, toAmount],
+       DO UPDATE SET amount = balances.amount + EXCLUDED.amount
+       RETURNING amount::text AS amount`,
+      [input.wallet_id, input.to_currency, input.to_amount],
     );
+    const toBalance = credit.rows[0];
+    if (!toBalance) throw new Error("No se pudo acreditar el saldo de destino");
 
-    const transactionResult = await client.query<TransactionRecord>(
+    const inserted = await client.query<TransactionRecord>(
       `INSERT INTO transactions (
-        wallet_id, type, from_currency, to_currency, from_amount, to_amount, exchange_rate
-      ) VALUES ($1, 'BUY', $2, $3, $4, $5, $6)
-      RETURNING *`,
-      [input.wallet_id, input.from_currency, input.to_currency, input.from_amount, toAmount, input.exchange_rate],
+         wallet_id, type, from_currency, to_currency, from_amount, to_amount, exchange_rate,
+         fee_amount, fee_currency, fee_percent, ars_rate_type
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $3, $9, $10)
+       RETURNING *`,
+      [
+        input.wallet_id,
+        input.type,
+        input.from_currency,
+        input.to_currency,
+        input.from_amount,
+        input.to_amount,
+        input.exchange_rate,
+        input.fee_amount,
+        input.fee_percent,
+        input.ars_rate_type,
+      ],
     );
+    const transaction = inserted.rows[0];
+    if (!transaction) throw new Error("INSERT INTO transactions no devolvió filas");
 
-    return {
-      transaction: transactionResult.rows[0],
-      balances: {
-        from: debitResult.rows[0],
-        to: creditResult.rows[0],
-      },
-    };
+    return { transaction, balances: { from: fromBalance.amount, to: toBalance.amount } };
   },
 
   /**
