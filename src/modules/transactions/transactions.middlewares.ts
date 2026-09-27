@@ -1,10 +1,64 @@
 import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
+import { AppError } from "../../utils/app-error";
+
 const uuidRegex = /^[0-9a-fA-F-]{36}$/;
-const currencyCodeRegex = /^[A-Z0-9]{3,10}$/;
+const currencyCodeRegex = /^[A-Z0-9]{3,10}$/i;
 
 const transactionTypeSchema = z.enum(["BUY", "SELL", "EXCHANGE", "DEPOSIT"]);
+
+const currencyField = (label: string) =>
+  z
+    .string({ error: `La moneda ${label} es obligatoria` })
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{3}$/, `La moneda ${label} debe ser un código de 3 letras, ej. COP`);
+
+/**
+ * Compra, venta o intercambio. No se aceptan wallet_id ni exchange_rate: la wallet sale del token
+ * y la tasa la calcula el servidor. El blue no se ofrece para operar porque es un mercado informal.
+ */
+const exchangeSchema = z
+  .object({
+    from_currency: currencyField("de origen"),
+    to_currency: currencyField("de destino"),
+    amount: z.coerce
+      .number({ error: "El monto debe ser un número" })
+      .positive("El monto debe ser mayor que 0"),
+    ars_rate: z.enum(["oficial", "mep"], { error: "ars_rate debe ser oficial o mep" }).default("mep"),
+  })
+  .strict()
+  .refine((input) => input.from_currency !== input.to_currency, {
+    path: ["to_currency"],
+    message: "La moneda de destino debe ser distinta a la de origen",
+  });
+
+export type ExchangeBody = z.output<typeof exchangeSchema>;
+
+function parseExchange(value: unknown): ExchangeBody {
+  const result = exchangeSchema.safeParse(value);
+  if (!result.success) {
+    throw new AppError(
+      400,
+      "INVALID_EXCHANGE_PAYLOAD",
+      "Datos de la operación inválidos",
+      result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+    );
+  }
+  return result.data;
+}
+
+/** Valida el body de POST /api/transactions/me/exchange. */
+export function validateExchange(req: Request, _res: Response, next: NextFunction): void {
+  req.body = parseExchange(req.body);
+  next();
+}
+
+/** Valida `?from_currency&to_currency&amount&ars_rate` (Express 5: req.query es de solo lectura). */
+export function parseExchangeQuery(query: unknown): ExchangeBody {
+  return parseExchange(query);
+}
 
 const createTransactionSchema = z.object({
   wallet_id: z.string().trim().regex(uuidRegex, "El id de la wallet no es válido"),
