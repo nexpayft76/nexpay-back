@@ -46,9 +46,25 @@ function parseQuery<S extends z.ZodType>(schema: S, query: unknown, code: string
 export const parseRatesQuery = (query: unknown) => parseQuery(ratesQuerySchema, query, "INVALID_RATES_QUERY");
 export const parseConvertQuery = (query: unknown) => parseQuery(convertQuerySchema, query, "INVALID_CONVERT_QUERY");
 
-const historyQuerySchema = z.object({
-  currency: currencyCodeSchema,
-  range: z.enum(["1w", "1m", "3m", "6m", "1y"], { error: "range debe ser 1w, 1m, 3m, 6m o 1y" }).default("1m"),
-});
+/**
+ * Formato nuevo: ?from=COP&to=EUR. Formato anterior (se mantiene): ?currency=EUR, que equivale a
+ * from=USD&to=EUR (y currency=USD equivale a USD → COP, el corredor).
+ */
+const historyQuerySchema = z
+  .object({
+    from: currencyCodeSchema.optional(),
+    to: currencyCodeSchema.optional(),
+    currency: currencyCodeSchema.optional(),
+    range: z.enum(["1w", "1m", "3m", "6m", "1y"], { error: "range debe ser 1w, 1m, 3m, 6m o 1y" }).default("1m"),
+  })
+  .refine((q) => (q.from && q.to) || q.currency, {
+    message: "Indicá from y to (ej. from=COP&to=EUR) o currency",
+    path: ["from"],
+  })
+  .transform(({ from, to, currency, range }) => {
+    if (from && to) return { from, to, range };
+    const code = currency ?? "COP";
+    return code === "USD" ? { from: "USD", to: "COP", range } : { from: "USD", to: code, range };
+  });
 
 export const parseHistoryQuery = (query: unknown) => parseQuery(historyQuerySchema, query, "INVALID_HISTORY_QUERY");

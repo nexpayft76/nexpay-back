@@ -18,6 +18,6 @@ export async function convert(req: Request, res: Response): Promise<void> {
 }
 
 export async function getHistory(req: Request, res: Response): Promise<void> {
-  const { currency, range } = parseHistoryQuery(req.query);
-  res.status(200).json({ data: await ratesHistoryService.getHistory(currency, range) });
+  const { from, to, range } = parseHistoryQuery(req.query);
+  res.status(200).json({ data: await ratesHistoryService.getPairHistory(from, to, range) });
 }
