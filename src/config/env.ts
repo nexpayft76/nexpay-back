@@ -20,6 +20,9 @@ const envSchema = z.object({
   // Peso argentino: dólar MEP desde DolarApi. Cambia durante el día, por eso su caché es más corta.
   DOLARAPI_BASE_URL: z.url().default("https://dolarapi.com/v1"),
   ARS_RATES_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+  // Historial para gráficos: ARS desde ArgentinaDatos (mismo autor que DolarApi). Cambia poco: caché de 6 h.
+  ARGENTINADATOS_BASE_URL: z.url().default("https://api.argentinadatos.com/v1"),
+  HISTORY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(21600),
 });
 
 const parsed = envSchema.safeParse(process.env);
