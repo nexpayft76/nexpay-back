@@ -1,7 +1,7 @@
 import { Router } from "express";
 
-import { createWallet, getWallet, getWalletByUser, listWallets } from "./wallets.controller";
-import { validateCreateWallet, validateUserId, validateWalletId } from "./wallets.middlewares";
+import { getWallet, getWalletByUser, listWallets } from "./wallets.controller";
+import { validateUserId, validateWalletId } from "./wallets.middlewares";
 
 export const walletsRouter = Router();
 
@@ -16,29 +16,6 @@ export const walletsRouter = Router();
  *         description: Lista de wallets
  */
 walletsRouter.get("/", listWallets);
-
-/**
- * @openapi
- * /api/wallets:
- *   post:
- *     summary: Crear wallet
- *     tags: [Wallets]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [user_id]
- *             properties:
- *               user_id:
- *                 type: string
- *                 example: 123e4567-e89b-12d3-a456-426614174000
- *     responses:
- *       201:
- *         description: Wallet creada
- */
-walletsRouter.post("/", validateCreateWallet, createWallet);
 
 /**
  * @openapi

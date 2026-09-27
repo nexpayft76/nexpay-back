@@ -7,12 +7,7 @@ const swaggerDefinition = {
     version: "1.0.0",
     description: "API para gestión de usuarios, wallets, balances, monedas y transacciones.",
   },
-  servers: [
-    {
-      url: "http://localhost:3000",
-      description: "Servidor local",
-    },
-  ],
+  // Sin "servers": Swagger usa el mismo host desde el que se abre /docs (local o Railway).
   components: {
     securitySchemes: {
       bearerAuth: {
@@ -22,6 +17,8 @@ const swaggerDefinition = {
       },
     },
   },
+  // Por defecto todas las rutas piden token (candado en /docs). Registro y login lo anulan con `security: []`.
+  security: [{ bearerAuth: [] }],
 };
 
 export const swaggerSpec = swaggerJSDoc({

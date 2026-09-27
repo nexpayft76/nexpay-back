@@ -7,10 +7,6 @@ export interface WalletRecord {
   updated_at: string;
 }
 
-export interface CreateWalletInput {
-  user_id: string;
-}
-
 export const walletsRepository = {
   async findAll(): Promise<WalletRecord[]> {
     const { rows } = await pool.query<WalletRecord>(
@@ -31,15 +27,4 @@ export const walletsRepository = {
     );
     return rows[0] ?? null;
   },
-
-  async create(input: CreateWalletInput): Promise<WalletRecord> {
-    const { rows } = await pool.query<WalletRecord>(
-      `INSERT INTO wallets (user_id)
-       VALUES ($1)
-       RETURNING *`,
-      [input.user_id],
-    );
-    return rows[0];
-  },
-
 };

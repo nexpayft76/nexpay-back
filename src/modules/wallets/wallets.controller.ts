@@ -31,8 +31,3 @@ export async function getWalletByUser(req: Request, res: Response): Promise<void
   res.status(200).json({ data: wallet });
 }
 
-export async function createWallet(req: Request, res: Response): Promise<void> {
-  const wallet = await walletsService.createWallet(req.body);
-  res.status(201).json({ data: wallet });
-}
-
