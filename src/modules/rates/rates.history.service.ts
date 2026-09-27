@@ -9,8 +9,8 @@ import {
   type UsdHistory,
 } from "../../integrations/frankfurter.client";
 import { AppError } from "../../utils/app-error";
-import { createCachedSource } from "../../utils/cached-source";
-import { roundTo } from "../../utils/money";
+import { createCachedSource, type CachedResult } from "../../utils/cached-source";
+import { roundSignificant, roundTo } from "../../utils/money";
 import { currenciesRepository } from "../currencies/currencies.repository";
 import { createRatesStore } from "./rates.repository";
 import type { RatesSource } from "./rates.service";
@@ -19,11 +19,11 @@ import type { RatesSource } from "./rates.service";
 export const HISTORY_RANGES = { "1w": 7, "1m": 30, "3m": 91, "6m": 182, "1y": 365 } as const;
 export type HistoryRange = keyof typeof HISTORY_RANGES;
 
-/** Se descarga un poco más de un año una sola vez; los rangos se recortan de ahí. */
+/** Se descarga un poco más de un año una sola vez; los rangos y los pares se calculan de ahí. */
 const DOWNLOAD_DAYS = 370;
 const ARS = "ARS";
-/** Si eligen USD se grafica el par del corredor: 1 USD en COP. */
-const USD_DEFAULT_QUOTE = "COP";
+
+type HistoryProvider = "frankfurter" | "argentinadatos";
 
 const usdHistoryCache = createCachedSource(
   "Frankfurter (historial)",
@@ -37,7 +37,7 @@ const arsHistoryCache = createCachedSource(
 );
 
 export interface HistorySeries {
-  /** "COP", "EUR"… o el tipo de dólar para ARS ("oficial", "mep", "blue"). */
+  /** "COP-EUR" para un par simple, o el tipo de dólar si participa ARS ("oficial", "mep", "blue"). */
   key: string;
   label: string;
   points: HistoryPoint[];
@@ -52,13 +52,14 @@ export interface HistorySeries {
 }
 
 export interface HistoryResponse {
-  currency: string;
-  base: string;
-  quote: string;
-  range: HistoryRange;
+  /** Moneda de origen: la serie es "1 {from} = X {to}". */
   from: string;
   to: string;
-  provider: "frankfurter" | "argentinadatos";
+  range: HistoryRange;
+  /** Primer y último día del rango (el último es la última tasa válida). */
+  start: string;
+  end: string;
+  providers: HistoryProvider[];
   source: RatesSource;
   stale: boolean;
   fetched_at: string;
@@ -78,11 +79,11 @@ function statsOf(points: HistoryPoint[]): HistorySeries["stats"] {
   if (!first || !last) return null;
   const values = points.map((p) => p.value);
   return {
-    first: roundTo(first.value, 6),
-    last: roundTo(last.value, 6),
+    first: roundSignificant(first.value),
+    last: roundSignificant(last.value),
     change_pct: roundTo(((last.value - first.value) / first.value) * 100, 2),
-    min: roundTo(Math.min(...values), 6),
-    max: roundTo(Math.max(...values), 6),
+    min: roundSignificant(Math.min(...values)),
+    max: roundSignificant(Math.max(...values)),
   };
 }
 
@@ -91,16 +92,37 @@ function statsOf(points: HistoryPoint[]): HistorySeries["stats"] {
  * (la última tasa válida), no desde hoy: así un fin de semana o una caída no dejan el gráfico vacío.
  */
 function trimToRange(all: Array<{ key: string; label: string; points: HistoryPoint[] }>, range: HistoryRange) {
-  const lastDate = all.flatMap((s) => s.points.map((p) => p.date)).sort().at(-1);
-  if (!lastDate) return { from: "", to: "", series: [] as HistorySeries[] };
-  const fromDate = isoDaysAgo(HISTORY_RANGES[range], new Date(`${lastDate}T00:00:00Z`));
+  const end = all.flatMap((s) => s.points.map((p) => p.date)).sort().at(-1);
+  if (!end) return { start: "", end: "", series: [] as HistorySeries[] };
+  const start = isoDaysAgo(HISTORY_RANGES[range], new Date(`${end}T00:00:00Z`));
   const series = all.map(({ key, label, points }) => {
-    const inRange = points
-      .filter((p) => p.date >= fromDate)
-      .map((p) => ({ date: p.date, value: roundTo(p.value, 6) }));
+    const inRange = points.filter((p) => p.date >= start);
     return { key, label, points: inRange, stats: statsOf(inRange) };
   });
-  return { from: fromDate, to: lastDate, series };
+  return { start, end, series };
+}
+
+/** Serie "unidades de `code` por 1 USD" indexada por fecha. USD no necesita serie (siempre vale 1). */
+function toDateMap(points: HistoryPoint[] | undefined): Map<string, number> {
+  return new Map((points ?? []).map((p) => [p.date, p.value]));
+}
+
+/**
+ * Cruza dos series contra USD: 1 {from} = (to por USD) / (from por USD) {to}.
+ * Solo se usan las fechas que existen en las dos (ej. Frankfurter no publica los fines de semana).
+ * `null` en una serie = esa moneda es USD (vale 1 todos los días).
+ */
+function crossSeries(fromPerUsd: Map<string, number> | null, toPerUsd: Map<string, number> | null): HistoryPoint[] {
+  const dates = fromPerUsd && toPerUsd
+    ? [...fromPerUsd.keys()].filter((d) => toPerUsd.has(d))
+    : [...(fromPerUsd ?? toPerUsd ?? new Map<string, number>()).keys()];
+
+  return dates.sort().flatMap((date) => {
+    const fromValue = fromPerUsd ? fromPerUsd.get(date) : 1;
+    const toValue = toPerUsd ? toPerUsd.get(date) : 1;
+    if (fromValue === undefined || toValue === undefined) return [];
+    return [{ date, value: roundSignificant(toValue / fromValue) }];
+  });
 }
 
 function staleWarning(provider: string, fetchedAt: number): string {
@@ -109,59 +131,91 @@ function staleWarning(provider: string, fetchedAt: number): string {
 }
 
 export const ratesHistoryService = {
-  async getHistory(currency: string, range: HistoryRange): Promise<HistoryResponse> {
+  /**
+   * Historial del par `from` → `to` ("1 from = X to"), para cualquier combinación de monedas activas.
+   * - Sin ARS: una serie, calculada con Frankfurter (días hábiles).
+   * - Con ARS: tres series (oficial, MEP, blue) desde ArgentinaDatos, cruzadas con Frankfurter si hace falta.
+   */
+  async getPairHistory(from: string, to: string, range: HistoryRange): Promise<HistoryResponse> {
+    if (from === to) {
+      throw new AppError(400, "INVALID_HISTORY_QUERY", "Las monedas de origen y destino deben ser distintas");
+    }
     const active = (await currenciesRepository.findAll()).map((c) => c.code);
-    if (!active.includes(currency)) {
-      throw new AppError(400, "UNSUPPORTED_CURRENCY", `Moneda no soportada: ${currency}. Disponibles: ${active.join(", ")}`);
+    for (const code of [from, to]) {
+      if (!active.includes(code)) {
+        throw new AppError(400, "UNSUPPORTED_CURRENCY", `Moneda no soportada: ${code}. Disponibles: ${active.join(", ")}`);
+      }
     }
 
+    const involvesArs = from === ARS || to === ARS;
+    // Frankfurter hace falta si alguna moneda no es USD ni ARS (COP, EUR...).
+    const needsFrankfurter = [from, to].some((c) => c !== PIVOT_CURRENCY && c !== ARS);
+
     try {
-      if (currency === ARS) {
-        const result = await arsHistoryCache.get("1y", () => fetchArsHistory(isoDaysAgo(DOWNLOAD_DAYS)));
-        const history: ArsHistory = result.value;
-        const all = (Object.keys(ARS_RATE_TYPES) as ArsRateType[])
-          .filter((type) => history[type])
-          .map((type) => ({ key: type, label: `Dólar ${ARS_RATE_TYPES[type].label}`, points: history[type] ?? [] }));
-        const trimmed = trimToRange(all, range);
-        const stale = result.source === "fallback";
-        return {
-          currency,
-          base: PIVOT_CURRENCY,
-          quote: ARS,
-          range,
-          ...trimmed,
-          provider: "argentinadatos",
-          source: result.source,
-          stale,
-          fetched_at: new Date(result.fetchedAt).toISOString(),
-          warnings: stale ? [staleWarning("ArgentinaDatos", result.fetchedAt)] : [],
-        };
+      const providers: HistoryProvider[] = [];
+      const loaded: Array<{ provider: string; result: CachedResult<unknown> }> = [];
+
+      let usd: UsdHistory = {};
+      if (needsFrankfurter) {
+        const quotes = active.filter((c) => c !== PIVOT_CURRENCY && c !== ARS).sort();
+        const result = await usdHistoryCache.get(`1y:${quotes.join(",")}`, () =>
+          fetchUsdHistory(quotes, isoDaysAgo(DOWNLOAD_DAYS), isoDaysAgo(0)),
+        );
+        usd = result.value;
+        providers.push("frankfurter");
+        loaded.push({ provider: "Frankfurter", result });
       }
 
-      // USD, EUR, COP: una sola descarga de Frankfurter con todas las monedas activas (menos USD y ARS).
-      const quotes = active.filter((c) => c !== PIVOT_CURRENCY && c !== ARS).sort();
-      const quote = currency === PIVOT_CURRENCY ? USD_DEFAULT_QUOTE : currency;
-      const result = await usdHistoryCache.get(`1y:${quotes.join(",")}`, () =>
-        fetchUsdHistory(quotes, isoDaysAgo(DOWNLOAD_DAYS), isoDaysAgo(0)),
-      );
-      const history: UsdHistory = result.value;
-      const trimmed = trimToRange([{ key: quote, label: `1 USD en ${quote}`, points: history[quote] ?? [] }], range);
-      const stale = result.source === "fallback";
+      let ars: ArsHistory = {};
+      if (involvesArs) {
+        const result = await arsHistoryCache.get("1y", () => fetchArsHistory(isoDaysAgo(DOWNLOAD_DAYS)));
+        ars = result.value;
+        providers.push("argentinadatos");
+        loaded.push({ provider: "ArgentinaDatos", result });
+      }
+
+      // "Unidades de la moneda por 1 USD": USD = null (vale 1); ARS depende del tipo de dólar.
+      const perUsd = (code: string, arsType?: ArsRateType): Map<string, number> | null => {
+        if (code === PIVOT_CURRENCY) return null;
+        if (code === ARS) return toDateMap(arsType ? ars[arsType] : undefined);
+        return toDateMap(usd[code]);
+      };
+
+      const all = involvesArs
+        ? (Object.keys(ARS_RATE_TYPES) as ArsRateType[])
+            .filter((type) => ars[type])
+            .map((type) => ({
+              key: type,
+              label: `Dólar ${ARS_RATE_TYPES[type].label}`,
+              points: crossSeries(perUsd(from, type), perUsd(to, type)),
+            }))
+        : [{ key: `${from}-${to}`, label: `1 ${from} en ${to}`, points: crossSeries(perUsd(from), perUsd(to)) }];
+
+      const trimmed = trimToRange(all, range);
+      const stale = loaded.some((l) => l.result.source === "fallback");
+      const source: RatesSource = stale
+        ? "fallback"
+        : loaded.some((l) => l.result.source === "live")
+          ? "live"
+          : "cache";
+      const oldestFetch = Math.min(...loaded.map((l) => l.result.fetchedAt));
+
       return {
-        currency,
-        base: PIVOT_CURRENCY,
-        quote,
+        from,
+        to,
         range,
         ...trimmed,
-        provider: "frankfurter",
-        source: result.source,
+        providers,
+        source,
         stale,
-        fetched_at: new Date(result.fetchedAt).toISOString(),
-        warnings: stale ? [staleWarning("Frankfurter", result.fetchedAt)] : [],
+        fetched_at: new Date(oldestFetch).toISOString(),
+        warnings: loaded
+          .filter((l) => l.result.source === "fallback")
+          .map((l) => staleWarning(l.provider, l.result.fetchedAt)),
       };
     } catch (err) {
       if (err instanceof AppError) throw err;
-      // Solo llega acá si la fuente falló y nunca hubo un historial guardado.
+      // Solo llega acá si una fuente falló y nunca hubo un historial guardado.
       throw new AppError(503, "HISTORY_UNAVAILABLE", "El historial de tasas no está disponible en este momento");
     }
   },

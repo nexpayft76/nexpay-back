@@ -198,27 +198,31 @@ ratesRouter.get("/convert", convert);
  * @openapi
  * /api/rates/history:
  *   get:
- *     summary: Historial de una moneda contra USD, para gráficos
+ *     summary: Historial de un par de monedas, para gráficos
  *     description: |
- *       Serie diaria de "1 USD = X {moneda}" en el rango pedido, contado hacia atrás desde la
- *       **última tasa válida** (no desde hoy).
- *       - **COP, EUR**: Frankfurter (días hábiles). **USD**: se grafica 1 USD en COP (el corredor).
- *       - **ARS**: ArgentinaDatos, tres series (oficial, MEP, blue), promedio compra/venta, todos los días.
+ *       Serie diaria de "1 {from} = X {to}" en el rango pedido, contado hacia atrás desde la
+ *       **última tasa válida** (no desde hoy). Sirve cualquier par entre las monedas activas.
+ *       - **Sin ARS** (ej. COP → EUR): una serie, calculada con Frankfurter (días hábiles).
+ *       - **Con ARS** (ej. ARS → COP): tres series (oficial, MEP, blue) desde ArgentinaDatos,
+ *         cruzadas con Frankfurter cuando la otra moneda no es USD (solo días con datos en ambas).
  *
- *       Caché de 6 h. Si la fuente falla, se usa el último historial guardado y se avisa en `warnings`.
+ *       Formato anterior aceptado: `?currency=EUR` equivale a `from=USD&to=EUR`.
+ *       Caché de 6 h. Si una fuente falla, se usa su último historial guardado y se avisa en `warnings`.
  *     tags: [Rates]
  *     security: []
  *     parameters:
  *       - in: query
- *         name: currency
- *         required: true
- *         schema: { type: string, example: ARS }
+ *         name: from
+ *         schema: { type: string, example: COP }
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, example: USD }
  *       - in: query
  *         name: range
  *         schema: { type: string, enum: [1w, 1m, 3m, 6m, 1y], default: 1m }
  *     responses:
  *       200:
- *         description: Series históricas
+ *         description: Series históricas del par
  *         content:
  *           application/json:
  *             schema:
@@ -227,13 +231,12 @@ ratesRouter.get("/convert", convert);
  *                 data:
  *                   type: object
  *                   properties:
- *                     currency: { type: string, example: ARS }
- *                     base: { type: string, example: USD }
- *                     quote: { type: string, example: ARS }
+ *                     from: { type: string, example: COP }
+ *                     to: { type: string, example: USD }
  *                     range: { type: string, example: 1m }
- *                     from: { type: string, example: "2026-08-27" }
- *                     to: { type: string, example: "2026-09-26" }
- *                     provider: { type: string, enum: [frankfurter, argentinadatos] }
+ *                     start: { type: string, example: "2026-08-26" }
+ *                     end: { type: string, example: "2026-09-25" }
+ *                     providers: { type: array, items: { type: string, enum: [frankfurter, argentinadatos] } }
  *                     source: { $ref: "#/components/schemas/RatesSource" }
  *                     stale: { type: boolean }
  *                     fetched_at: { type: string, format: date-time }
@@ -243,29 +246,29 @@ ratesRouter.get("/convert", convert);
  *                       items:
  *                         type: object
  *                         properties:
- *                           key: { type: string, example: mep }
- *                           label: { type: string, example: "Dólar MEP (bolsa)" }
+ *                           key: { type: string, example: COP-USD }
+ *                           label: { type: string, example: "1 COP en USD" }
  *                           points:
  *                             type: array
  *                             items:
  *                               type: object
  *                               properties:
- *                                 date: { type: string, example: "2026-09-26" }
- *                                 value: { type: number, example: 1550.8 }
+ *                                 date: { type: string, example: "2026-09-25" }
+ *                                 value: { type: number, example: 0.0003055021 }
  *                           stats:
  *                             type: object
  *                             nullable: true
  *                             properties:
  *                               first: { type: number }
  *                               last: { type: number }
- *                               change_pct: { type: number, example: 2.35 }
+ *                               change_pct: { type: number, example: 1.2 }
  *                               min: { type: number }
  *                               max: { type: number }
  *       400:
- *         description: Moneda o rango inválidos (INVALID_HISTORY_QUERY / UNSUPPORTED_CURRENCY)
+ *         description: Monedas o rango inválidos, o la misma moneda en origen y destino
  *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
  *       503:
- *         description: La fuente falló y nunca hubo un historial guardado (HISTORY_UNAVAILABLE)
+ *         description: Una fuente falló y nunca hubo un historial guardado (HISTORY_UNAVAILABLE)
  *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
  */
 ratesRouter.get("/history", getHistory);
