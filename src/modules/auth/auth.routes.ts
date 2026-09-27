@@ -44,6 +44,7 @@ export const authRouter = Router();
  *   post:
  *     summary: Registra un usuario y crea su wallet con balances en 0
  *     description: Contraseña con bcrypt. Usuario, wallet y balances se crean en una sola transacción SQL. Devuelve un JWT.
+ *     security: []
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -79,6 +80,7 @@ authRouter.post("/register", validateRegister, register);
  * /api/auth/login:
  *   post:
  *     summary: Inicia sesión y devuelve un JWT
+ *     security: []
  *     tags: [Auth]
  *     requestBody:
  *       required: true
