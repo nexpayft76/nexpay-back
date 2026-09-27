@@ -45,3 +45,10 @@ function parseQuery<S extends z.ZodType>(schema: S, query: unknown, code: string
 
 export const parseRatesQuery = (query: unknown) => parseQuery(ratesQuerySchema, query, "INVALID_RATES_QUERY");
 export const parseConvertQuery = (query: unknown) => parseQuery(convertQuerySchema, query, "INVALID_CONVERT_QUERY");
+
+const historyQuerySchema = z.object({
+  currency: currencyCodeSchema,
+  range: z.enum(["1w", "1m", "3m", "6m", "1y"], { error: "range debe ser 1w, 1m, 3m, 6m o 1y" }).default("1m"),
+});
+
+export const parseHistoryQuery = (query: unknown) => parseQuery(historyQuerySchema, query, "INVALID_HISTORY_QUERY");
