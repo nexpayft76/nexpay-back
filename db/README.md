@@ -10,6 +10,7 @@ PostgreSQL en Railway. El esquema vive en este directorio y cambia **solo median
 | `migrations/001_google_auth.sql` | Login con Google: columna `users.google_id` (UNIQUE), `password_hash` opcional y regla "contraseña o Google" | Aplicado |
 | `migrations/002_demo_deposits.sql` | Recargas: tipo `DEPOSIT` en `transactions` y `from_currency` opcional **solo** en depósitos | Aplicado |
 | `migrations/003_add_ars.sql` | Agrega el peso argentino (ARS) y su balance en 0 para las wallets existentes | Aplicado |
+| `migrations/004_last_known_rates.sql` | Tabla `last_known_rates`: última tasa válida de cada proveedor, para usarla si Frankfurter o DolarApi fallan | Aplicado |
 
 ## Reglas que el código debe respetar
 
