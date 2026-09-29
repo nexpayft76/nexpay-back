@@ -13,6 +13,8 @@ import { healthRouter } from "./routes/health.routes";
 export const app = express();
 
 app.disable("x-powered-by");
+// Railway pone un proxy delante: así req.ip es la IP real del cliente (la usa el límite de consultas).
+app.set("trust proxy", 1);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "100kb" }));
 

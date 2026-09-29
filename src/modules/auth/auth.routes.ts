@@ -1,6 +1,7 @@
 import { Router } from "express";
 
-import { login, logout, me, register } from "./auth.controller";
+import { rateLimit } from "../../middlewares/rate-limit.middleware";
+import { emailAvailable, login, logout, me, register } from "./auth.controller";
 import { requireAuth, validateLogin, validateRegister } from "./auth.middlewares";
 
 export const authRouter = Router();
@@ -74,6 +75,41 @@ export const authRouter = Router();
  *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
  */
 authRouter.post("/register", validateRegister, register);
+
+/**
+ * @openapi
+ * /api/auth/email-available:
+ *   get:
+ *     summary: ¿El email está libre para registrarse?
+ *     description: |
+ *       Para validar el formulario de registro en tiempo real (antes de enviarlo).
+ *       Limitado a 20 consultas por minuto por IP, para que no sirva para averiguar emails en masa.
+ *       El registro igual vuelve a verificarlo (409 EMAIL_ALREADY_REGISTERED).
+ *     tags: [Auth]
+ *     security: []
+ *     parameters:
+ *       - { in: query, name: email, required: true, schema: { type: string, format: email, example: "ana@nexpay.com" } }
+ *     responses:
+ *       200:
+ *         description: Resultado de la consulta
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     email: { type: string, example: "ana@nexpay.com" }
+ *                     available: { type: boolean, example: false }
+ *       400:
+ *         description: Email inválido (INVALID_EMAIL_QUERY)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       429:
+ *         description: Demasiadas consultas (TOO_MANY_REQUESTS)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ */
+authRouter.get("/email-available", rateLimit({ windowMs: 60_000, max: 20 }), emailAvailable);
 
 /**
  * @openapi

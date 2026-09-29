@@ -56,6 +56,22 @@ function validateBody(schema: z.ZodType, errorCode: string, message: string) {
   };
 }
 
+const emailQuerySchema = z.object({ email: emailSchema });
+
+/** Valida `?email=` de GET /api/auth/email-available (Express 5: req.query es de solo lectura). */
+export function parseEmailQuery(query: unknown): string {
+  const result = emailQuerySchema.safeParse(query);
+  if (!result.success) {
+    throw new AppError(
+      400,
+      "INVALID_EMAIL_QUERY",
+      "Email inválido",
+      result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+    );
+  }
+  return result.data.email;
+}
+
 export const validateRegister = validateBody(registerSchema, "INVALID_REGISTER_PAYLOAD", "Datos de registro inválidos");
 export const validateLogin = validateBody(loginSchema, "INVALID_LOGIN_PAYLOAD", "Datos de inicio de sesión inválidos");
 
