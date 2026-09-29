@@ -5,6 +5,7 @@ import { corsOptions } from "./config/cors";
 import { swaggerSpec } from "./config/swagger";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
 import { requestLogger } from "./middlewares/request-logger.middleware";
+import { securityHeaders } from "./middlewares/security-headers.middleware";
 import { balancesRouter, currenciesRouter, transactionsRouter, usersRouter, walletsRouter } from "./modules";
 import { requireAuth } from "./modules/auth/auth.middlewares";
 import { authRouter } from "./modules/auth/auth.routes";
@@ -19,6 +20,7 @@ app.set("etag", false); // Sin respuestas 304: la API no se cachea (ver "no-stor
 // Así req.ip es la IP real del cliente (la usa el límite de consultas).
 app.set("trust proxy", 2);
 app.use(requestLogger);
+app.use(securityHeaders);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "100kb" }));
 // Datos de sesión y de dinero: nunca en caché (ni en el navegador ni en el proxy de Vercel).

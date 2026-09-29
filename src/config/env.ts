@@ -28,6 +28,9 @@ const envSchema = z.object({
   // Comisión por compra/venta/intercambio, en % del monto de origen (1 = 1%).
   // 0 para la Demo 1 (sin comisión); se activa en la demo final (ej. 1).
   EXCHANGE_FEE_PERCENT: z.coerce.number().min(0).max(10).default(0),
+  // Emails (separados por coma) que pueden usar el CRUD de administración: listar usuarios, billeteras,
+  // saldos y transacciones de todos, editar usuarios y el catálogo de monedas. Vacío = nadie.
+  ADMIN_EMAILS: z.string().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -55,6 +58,11 @@ export const env = {
   jwtExpiresInSeconds: durationToSeconds(data.JWT_EXPIRES_IN),
   isProduction: data.NODE_ENV === "production",
   demoDepositsEnabled: data.DEMO_DEPOSITS_ENABLED === "true",
+  adminEmails: new Set(
+    data.ADMIN_EMAILS.split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  ),
   // SSL explícito si se define DB_SSL; si no, activo solo en producción.
   dbSsl: data.DB_SSL ? data.DB_SSL === "true" : data.NODE_ENV === "production",
   // Varios orígenes separados por coma; admite "*" para previews (ver src/config/cors.ts).

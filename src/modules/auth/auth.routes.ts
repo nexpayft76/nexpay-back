@@ -73,8 +73,11 @@ export const authRouter = Router();
  *       409:
  *         description: El email ya está registrado (EMAIL_ALREADY_REGISTERED)
  *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       429:
+ *         description: Demasiados intentos desde la misma IP (TOO_MANY_REQUESTS); máximo 5 por minuto
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
  */
-authRouter.post("/register", validateRegister, register);
+authRouter.post("/register", rateLimit({ windowMs: 60_000, max: 5 }), validateRegister, register);
 
 /**
  * @openapi
@@ -146,8 +149,12 @@ authRouter.get("/email-available", rateLimit({ windowMs: 60_000, max: 20 }), ema
  *       403:
  *         description: Cuenta suspendida o cerrada (ACCOUNT_DISABLED)
  *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       429:
+ *         description: Demasiados intentos desde la misma IP (TOO_MANY_REQUESTS); máximo 10 por minuto
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
  */
-authRouter.post("/login", validateLogin, login);
+// Límite por IP contra la prueba masiva de contraseñas (fuerza bruta).
+authRouter.post("/login", rateLimit({ windowMs: 60_000, max: 10 }), validateLogin, login);
 
 /**
  * @openapi

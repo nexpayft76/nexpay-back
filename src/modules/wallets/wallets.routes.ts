@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { depositToMyWallet, getMyWallet, getWallet, getWalletByUser, listWallets } from "./wallets.controller";
 import { validateDeposit, validateUserId, validateWalletId } from "./wallets.middlewares";
+import { requireAdmin } from "../auth/auth.middlewares";
 
 export const walletsRouter = Router();
 
@@ -126,7 +127,7 @@ walletsRouter.post("/me/deposits", validateDeposit, depositToMyWallet);
  *       200:
  *         description: Lista de wallets
  */
-walletsRouter.get("/", listWallets);
+walletsRouter.get("/", requireAdmin, listWallets);
 
 /**
  * @openapi
@@ -147,7 +148,7 @@ walletsRouter.get("/", listWallets);
  *       404:
  *         description: Wallet no encontrada
  */
-walletsRouter.get("/user/:userId", validateUserId, getWalletByUser);
+walletsRouter.get("/user/:userId", requireAdmin, validateUserId, getWalletByUser);
 
 /**
  * @openapi
@@ -168,4 +169,4 @@ walletsRouter.get("/user/:userId", validateUserId, getWalletByUser);
  *       404:
  *         description: Wallet no encontrada
  */
-walletsRouter.get("/:id", validateWalletId, getWallet);
+walletsRouter.get("/:id", requireAdmin, validateWalletId, getWallet);

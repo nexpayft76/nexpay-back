@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { createCurrency, deleteCurrency, getCurrency, listCurrencies, updateCurrency } from "./currencies.controller";
 import { validateCreateCurrency, validateCurrencyCode, validateUpdateCurrency } from "./currencies.middlewares";
+import { requireAdmin } from "../auth/auth.middlewares";
 
 export const currenciesRouter = Router();
 
@@ -46,7 +47,7 @@ currenciesRouter.get("/", listCurrencies);
  *       201:
  *         description: Moneda creada
  */
-currenciesRouter.post("/", validateCreateCurrency, createCurrency);
+currenciesRouter.post("/", requireAdmin, validateCreateCurrency, createCurrency);
 
 /**
  * @openapi
@@ -94,5 +95,5 @@ currenciesRouter.post("/", validateCreateCurrency, createCurrency);
  *         description: Moneda desactivada
  */
 currenciesRouter.get("/:code", validateCurrencyCode, getCurrency);
-currenciesRouter.patch("/:code", validateCurrencyCode, validateUpdateCurrency, updateCurrency);
-currenciesRouter.delete("/:code", validateCurrencyCode, deleteCurrency);
+currenciesRouter.patch("/:code", requireAdmin, validateCurrencyCode, validateUpdateCurrency, updateCurrency);
+currenciesRouter.delete("/:code", requireAdmin, validateCurrencyCode, deleteCurrency);
