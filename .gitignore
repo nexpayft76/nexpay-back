@@ -16,3 +16,6 @@ Thumbs.db
 # Editores
 .vscode/
 .idea/
+
+# Configuración local de Claude Code (servidores de prueba, permisos): no se sube
+.claude/
