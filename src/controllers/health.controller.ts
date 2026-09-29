@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { pool } from "../config/db";
+import { logger } from "../utils/logger";
 
 export async function getHealth(_req: Request, res: Response): Promise<void> {
   try {
@@ -11,7 +12,7 @@ export async function getHealth(_req: Request, res: Response): Promise<void> {
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
-    console.error("Health check falló:", err instanceof Error ? err.message : err);
+    logger.error("Health check falló", { error: err });
     res.status(503).json({ status: "error", database: "disconnected" });
   }
 }

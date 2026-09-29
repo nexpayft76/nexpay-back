@@ -1,8 +1,8 @@
 import { Router } from "express";
 
 import { rateLimit } from "../../middlewares/rate-limit.middleware";
-import { emailAvailable, login, logout, me, register } from "./auth.controller";
-import { requireAuth, validateLogin, validateRegister } from "./auth.middlewares";
+import { emailAvailable, login, logout, me, register, session } from "./auth.controller";
+import { optionalAuth, requireAuth, validateLogin, validateRegister } from "./auth.middlewares";
 
 export const authRouter = Router();
 
@@ -115,7 +115,7 @@ authRouter.get("/email-available", rateLimit({ windowMs: 60_000, max: 20 }), ema
  * @openapi
  * /api/auth/login:
  *   post:
- *     summary: Inicia sesión y devuelve un JWT
+ *     summary: Inicia sesión (deja la cookie de sesión HttpOnly y devuelve el JWT)
  *     security: []
  *     tags: [Auth]
  *     requestBody:
@@ -153,18 +153,40 @@ authRouter.post("/login", validateLogin, login);
  * @openapi
  * /api/auth/logout:
  *   post:
- *     summary: Cierra la sesión e invalida el token actual
+ *     summary: Cierra la sesión, invalida el token actual y borra la cookie
+ *     description: No responde 401 aunque la sesión ya haya vencido (así el logout no deja errores en la consola).
  *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
  *     responses:
  *       204:
- *         description: Sesión cerrada; el token deja de servir
- *       401:
- *         description: Token ausente, inválido, expirado o ya revocado (UNAUTHORIZED)
- *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *         description: Sesión cerrada; el token deja de servir y la cookie se borra
  */
-authRouter.post("/logout", requireAuth, logout);
+authRouter.post("/logout", optionalAuth, logout);
+
+/**
+ * @openapi
+ * /api/auth/session:
+ *   get:
+ *     summary: ¿Hay una sesión iniciada?
+ *     description: |
+ *       Responde 200 siempre: el usuario y cuándo vence la sesión, o `null` si no hay sesión.
+ *       El front lo usa al cargar la página (en vez de /me, que responde 401 sin sesión).
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Estado de la sesión
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   nullable: true
+ *                   type: object
+ *                   properties:
+ *                     user: { $ref: "#/components/schemas/PublicUser" }
+ *                     expires_at: { type: string, format: date-time }
+ */
+authRouter.get("/session", optionalAuth, session);
 
 /**
  * @openapi
