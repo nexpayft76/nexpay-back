@@ -4,6 +4,7 @@ import swaggerUi from "swagger-ui-express";
 import { corsOptions } from "./config/cors";
 import { swaggerSpec } from "./config/swagger";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
+import { requestLogger } from "./middlewares/request-logger.middleware";
 import { balancesRouter, currenciesRouter, transactionsRouter, usersRouter, walletsRouter } from "./modules";
 import { requireAuth } from "./modules/auth/auth.middlewares";
 import { authRouter } from "./modules/auth/auth.routes";
@@ -13,10 +14,18 @@ import { healthRouter } from "./routes/health.routes";
 export const app = express();
 
 app.disable("x-powered-by");
-// Railway pone un proxy delante: así req.ip es la IP real del cliente (la usa el límite de consultas).
-app.set("trust proxy", 1);
+app.set("etag", false); // Sin respuestas 304: la API no se cachea (ver "no-store" abajo).
+// Delante del back hay dos proxies: Vercel (reenvía /api desde el front) y el de Railway.
+// Así req.ip es la IP real del cliente (la usa el límite de consultas).
+app.set("trust proxy", 2);
+app.use(requestLogger);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "100kb" }));
+// Datos de sesión y de dinero: nunca en caché (ni en el navegador ni en el proxy de Vercel).
+app.use("/api", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
 
 app.get("/", (_req, res) => {
   res.json({ name: "NexPay API", status: "running" });

@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 /** De dónde salió el dato: recién pedido, de la caché vigente, o el último válido porque la API falló. */
 export type CacheSource = "live" | "cache" | "fallback";
 
@@ -76,7 +78,7 @@ export function createCachedSource<T>(
         cache = { value, fetchedAt: Date.now(), key, stale: false };
         // Guardar el respaldo no debe hacer fallar la respuesta.
         await store?.save(key, value, cache.fetchedAt).catch((err: unknown) => {
-          console.error(`${label}: no se pudo guardar el respaldo en la BD:`, err instanceof Error ? err.message : err);
+          logger.error(`${label}: no se pudo guardar el respaldo en la BD`, { error: err });
         });
         return { value, source: "live", fetchedAt: cache.fetchedAt };
       } catch (err) {
@@ -84,19 +86,19 @@ export function createCachedSource<T>(
         nextRetryAt = Date.now() + retryMs;
 
         if (cache && cache.key === key) {
-          console.warn(`${label} no disponible (${reason}); usando el último valor en memoria`);
+          logger.warn(`${label} no disponible; usando el último valor en memoria`, { reason });
           cache.stale = true;
           return fallback(cache);
         }
 
         const saved = await store?.load(key).catch(() => null);
         if (saved) {
-          console.warn(`${label} no disponible (${reason}); usando el último valor guardado en la BD`);
+          logger.warn(`${label} no disponible; usando el último valor guardado en la BD`, { reason });
           cache = { value: saved.value, fetchedAt: saved.fetchedAt, key, stale: true };
           return fallback(cache);
         }
 
-        console.error(`${label} no disponible y sin ningún valor previo: ${reason}`);
+        logger.error(`${label} no disponible y sin ningún valor previo`, { reason });
         throw err;
       }
     },

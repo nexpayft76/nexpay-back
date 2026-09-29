@@ -15,10 +15,16 @@ const swaggerDefinition = {
         scheme: "bearer",
         bearerFormat: "JWT",
       },
+      // El navegador usa la cookie HttpOnly que dejan el login y el registro (en /docs funciona sola).
+      cookieAuth: {
+        type: "apiKey",
+        in: "cookie",
+        name: "nexpay_session",
+      },
     },
   },
   // Por defecto todas las rutas piden token (candado en /docs). Registro y login lo anulan con `security: []`.
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [] }, { cookieAuth: [] }],
 };
 
 export const swaggerSpec = swaggerJSDoc({

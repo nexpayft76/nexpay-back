@@ -28,4 +28,6 @@ export const corsOptions: CorsOptions = {
     callback(null, origin === undefined || isAllowedOrigin(origin));
   },
   credentials: true,
+  // Para que el front pueda leer el id de cada petición y registrarlo junto a sus errores.
+  exposedHeaders: ["X-Request-Id"],
 };

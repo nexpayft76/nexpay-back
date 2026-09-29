@@ -2,8 +2,10 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { env } from "../../config/env";
+import { isAllowedOrigin } from "../../config/cors";
 import { AppError } from "../../utils/app-error";
-import { authRepository } from "./auth.repository";
+import { clearSessionCookie, readCookie, SESSION_COOKIE } from "./auth.cookies";
+import { authRepository, type AuthUserRecord } from "./auth.repository";
 import { isTokenRevoked } from "./auth.token-blacklist";
 import type { AuthContext } from "./auth.types";
 
@@ -81,33 +83,82 @@ function unauthorized(message: string): AppError {
   return new AppError(401, "UNAUTHORIZED", message);
 }
 
-/**
- * Protege una ruta: exige `Authorization: Bearer <token>` válido, no revocado
- * y de un usuario activo. Deja los datos del token en `req.auth`.
- */
-export async function requireAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
-  const [scheme, token] = (req.headers.authorization ?? "").split(" ");
-  if (scheme !== "Bearer" || !token) {
-    throw unauthorized("Falta el token de autenticación (Authorization: Bearer <token>)");
-  }
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
+/**
+ * De dónde sale el token: la cookie de sesión (navegador, HttpOnly) o la cabecera
+ * `Authorization: Bearer` (Swagger, Postman, pruebas). La cabecera tiene prioridad.
+ */
+function readToken(req: Request): { token: string; fromCookie: boolean } | null {
+  const [scheme, bearer] = (req.headers.authorization ?? "").split(" ");
+  if (scheme === "Bearer" && bearer) return { token: bearer, fromCookie: false };
+  const cookie = readCookie(req, SESSION_COOKIE);
+  return cookie ? { token: cookie, fromCookie: true } : null;
+}
+
+/** Verifica firma, vencimiento, que no esté revocado y que el usuario siga activo. Si no, 401. */
+export async function authenticate(token: string): Promise<{ auth: AuthContext; user: AuthUserRecord }> {
   let payload: jwt.JwtPayload;
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] });
     if (typeof decoded === "string") throw new Error("Payload inesperado");
     payload = decoded;
   } catch (err) {
-    throw unauthorized(err instanceof jwt.TokenExpiredError ? "El token expiró" : "Token inválido");
+    throw unauthorized(err instanceof jwt.TokenExpiredError ? "La sesión expiró" : "Sesión inválida");
   }
 
   const { sub, jti, exp } = payload;
-  if (!sub || !jti || !exp) throw unauthorized("Token inválido");
+  if (!sub || !jti || !exp) throw unauthorized("Sesión inválida");
   if (isTokenRevoked(jti)) throw unauthorized("La sesión fue cerrada");
 
   const user = await authRepository.findActiveById(sub);
   if (!user || user.status !== "active") throw unauthorized("El usuario no existe o no está activo");
 
-  req.auth = { userId: sub, jti, exp };
+  return { auth: { userId: sub, jti, exp }, user };
+}
+
+/**
+ * Defensa extra contra CSRF (además de SameSite=Lax): si la sesión viene en la cookie y la petición
+ * modifica datos, tiene que venir del front (Origin permitido) o de este mismo servidor (Swagger en /docs).
+ */
+function assertTrustedOrigin(req: Request): void {
+  const origin = req.headers.origin;
+  if (!origin || isAllowedOrigin(origin)) return;
+  try {
+    if (new URL(origin).host === req.headers.host) return;
+  } catch {
+    // Origin mal formado: se rechaza abajo.
+  }
+  throw new AppError(403, "FORBIDDEN_ORIGIN", "Origen no permitido para esta operación");
+}
+
+/**
+ * Protege una ruta: exige una sesión válida (cookie o Bearer), no revocada y de un usuario activo.
+ * Deja los datos del token en `req.auth`.
+ */
+export async function requireAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  const found = readToken(req);
+  if (!found) throw unauthorized("No hay una sesión iniciada");
+  if (found.fromCookie && !SAFE_METHODS.has(req.method)) assertTrustedOrigin(req);
+
+  req.auth = (await authenticate(found.token)).auth;
+  next();
+}
+
+/**
+ * Para rutas que responden con o sin sesión (GET /session, POST /logout): deja `req.auth` si hay
+ * una sesión válida y nunca responde 401. Si la cookie ya no sirve, la borra.
+ */
+export async function optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const found = readToken(req);
+  if (found) {
+    try {
+      req.auth = (await authenticate(found.token)).auth;
+    } catch (err) {
+      if (!(err instanceof AppError) || err.statusCode !== 401) throw err;
+      if (found.fromCookie) clearSessionCookie(res);
+    }
+  }
   next();
 }
 
