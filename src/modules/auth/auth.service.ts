@@ -75,6 +75,11 @@ export const authService = {
     }
   },
 
+  /** true si nadie se registró con ese email (el registro igual lo vuelve a verificar con UNIQUE). */
+  async isEmailAvailable(email: string): Promise<boolean> {
+    return (await authRepository.findByEmail(email)) === null;
+  },
+
   async login(input: LoginInput): Promise<AuthResult> {
     const user = await authRepository.findByEmail(input.email);
     const passwordOk = await bcrypt.compare(input.password, user?.password_hash ?? DUMMY_HASH);
