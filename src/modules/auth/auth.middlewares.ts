@@ -162,6 +162,19 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
   next();
 }
 
+/**
+ * Solo administradores (email en ADMIN_EMAILS). Va después de `requireAuth`.
+ * Protege el CRUD que ve o modifica datos de TODOS los usuarios: un usuario común solo usa las rutas /me.
+ */
+export async function requireAdmin(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  const auth = getAuth(req);
+  const user = await authRepository.findActiveById(auth.userId);
+  if (!user || !env.adminEmails.has(user.email.toLowerCase())) {
+    throw new AppError(403, "FORBIDDEN", "Esta operación es solo para administradores");
+  }
+  next();
+}
+
 /** Para controladores detrás de `requireAuth`, que garantiza que `req.auth` existe. */
 export function getAuth(req: Request): AuthContext {
   if (!req.auth) throw unauthorized("No autenticado");

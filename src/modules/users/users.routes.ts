@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { deleteUser, getUser, listUsers, updateUser } from "./users.controller";
 import { validateUpdateUser, validateUserId } from "./users.middlewares";
+import { requireAdmin } from "../auth/auth.middlewares";
 
 export const usersRouter = Router();
 
@@ -15,7 +16,7 @@ export const usersRouter = Router();
  *       200:
  *         description: Lista de usuarios
  */
-usersRouter.get("/", listUsers);
+usersRouter.get("/", requireAdmin, listUsers);
 
 /**
  * @openapi
@@ -36,7 +37,7 @@ usersRouter.get("/", listUsers);
  *       404:
  *         description: Usuario no encontrado
  */
-usersRouter.get("/:id", validateUserId, getUser);
+usersRouter.get("/:id", requireAdmin, validateUserId, getUser);
 
 /**
  * @openapi
@@ -71,7 +72,7 @@ usersRouter.get("/:id", validateUserId, getUser);
  *       404:
  *         description: Usuario no encontrado
  */
-usersRouter.patch("/:id", validateUserId, validateUpdateUser, updateUser);
+usersRouter.patch("/:id", requireAdmin, validateUserId, validateUpdateUser, updateUser);
 
 /**
  * @openapi
@@ -92,4 +93,4 @@ usersRouter.patch("/:id", validateUserId, validateUpdateUser, updateUser);
  *       404:
  *         description: Usuario no encontrado
  */
-usersRouter.delete("/:id", validateUserId, deleteUser);
+usersRouter.delete("/:id", requireAdmin, validateUserId, deleteUser);

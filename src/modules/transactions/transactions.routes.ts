@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { exchange, getTransaction, listTransactions, quoteExchange } from "./transactions.controller";
 import { validateExchange, validateTransactionId } from "./transactions.middlewares";
+import { requireAdmin } from "../auth/auth.middlewares";
 
 export const transactionsRouter = Router();
 
@@ -39,7 +40,7 @@ export const transactionsRouter = Router();
  *       200:
  *         description: Lista de transacciones
  */
-transactionsRouter.get("/", listTransactions);
+transactionsRouter.get("/", requireAdmin, listTransactions);
 
 /**
  * @openapi
@@ -144,4 +145,4 @@ transactionsRouter.post("/me/exchange", validateExchange, exchange);
  *         description: Transacción no encontrada
  */
 // Las rutas "/me/..." van antes de "/:id": si no, Express tomaría "me" como un id.
-transactionsRouter.get("/:id", validateTransactionId, getTransaction);
+transactionsRouter.get("/:id", requireAdmin, validateTransactionId, getTransaction);
