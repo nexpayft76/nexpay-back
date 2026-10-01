@@ -5,6 +5,8 @@ import { roundTo } from "../../utils/money";
 import { currenciesRepository } from "../currencies/currencies.repository";
 import { getRateSnapshot, quoteRate, type RatesSource } from "../rates/rates.service";
 import { transactionsRepository } from "../transactions/transactions.repository";
+import { usersRepository } from "../users/users.repository";
+import { notificationsService } from "../notifications";
 import { walletsRepository } from "./wallets.repository";
 
 /** Máximo por recarga ficticia, en la moneda recargada (evita saldos absurdos en la demo). */
@@ -170,7 +172,7 @@ export const walletsService = {
 
     const amount = input.amount.toFixed(currency.decimals);
 
-    return withTransaction(async (client) => {
+    const result = await withTransaction(async (client) => {
       const newBalance = await walletsRepository.creditBalance(client, wallet.id, currency.code, amount);
       const tx = await transactionsRepository.insertDeposit(client, {
         wallet_id: wallet.id,
@@ -179,12 +181,28 @@ export const walletsService = {
       });
       return {
         transaction_id: tx.id,
-        type: "DEPOSIT",
+        type: "DEPOSIT" as const,
         currency: currency.code,
         amount,
         new_balance: newBalance,
         created_at: tx.created_at.toISOString(),
       };
     });
+
+    // Envío de email con el resumen de recarga de saldo mediante AWS SES (asíncrono)
+    void usersRepository.findById(userId).then((user) => {
+      if (user) {
+        void notificationsService.sendDepositEmail({
+          user: { email: user.email, full_name: user.full_name },
+          currency: result.currency,
+          amount: result.amount,
+          new_balance: result.new_balance,
+          transaction_id: result.transaction_id,
+          created_at: result.created_at,
+        });
+      }
+    });
+
+    return result;
   },
 };

@@ -31,6 +31,11 @@ const envSchema = z.object({
   // Emails (separados por coma) que pueden usar el CRUD de administración: listar usuarios, billeteras,
   // saldos y transacciones de todos, editar usuarios y el catálogo de monedas. Vacío = nadie.
   ADMIN_EMAILS: z.string().default(""),
+  // AWS SES para envío de notificaciones por email
+  AWS_REGION: z.string().default("us-east-2"),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  SES_FROM_EMAIL: z.string().email().default("nexpay.team@gmail.com"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -67,4 +72,12 @@ export const env = {
   dbSsl: data.DB_SSL ? data.DB_SSL === "true" : data.NODE_ENV === "production",
   // Varios orígenes separados por coma; admite "*" para previews (ver src/config/cors.ts).
   corsOrigins: data.FRONTEND_URL.split(",").map((origin) => origin.trim().replace(/\/$/, "")),
+  // Configuración de AWS SES para emails
+  aws: {
+    region: data.AWS_REGION,
+    accessKeyId: data.AWS_ACCESS_KEY_ID,
+    secretAccessKey: data.AWS_SECRET_ACCESS_KEY,
+    fromEmail: data.SES_FROM_EMAIL,
+    isConfigured: Boolean(data.AWS_ACCESS_KEY_ID && data.AWS_SECRET_ACCESS_KEY && data.SES_FROM_EMAIL),
+  },
 };
