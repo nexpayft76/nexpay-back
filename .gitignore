@@ -1,0 +1,21 @@
+# Dependencias y build
+node_modules/
+dist/
+
+# Variables de entorno (nunca subir secretos)
+.env
+.env.*
+!.env.example
+
+# Logs y SO
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+
+# Configuración local de Claude Code (servidores de prueba, permisos): no se sube
+.claude/
