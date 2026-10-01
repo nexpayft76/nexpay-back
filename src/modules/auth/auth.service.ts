@@ -69,6 +69,7 @@ export const authService = {
 
       // Envío de email de bienvenida y agradecimiento por registrarse (asíncrono)
       void notificationsService.sendWelcomeEmail({
+        id: user.id,
         email: user.email,
         full_name: user.full_name,
       });

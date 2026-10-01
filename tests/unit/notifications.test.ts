@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { env } from "../../src/config/env";
 import {
   buildDepositEmail,
   buildExchangeEmail,
   buildWelcomeEmail,
 } from "../../src/modules/notifications/notifications.templates";
+import { notificationsRepository } from "../../src/modules/notifications/notifications.repository";
 import { notificationsService } from "../../src/modules/notifications/notifications.service";
 
 describe("Notifications Module - AWS SES Emails", () => {
   const dummyUser = {
+    id: "00000000-0000-4000-8000-000000000001",
     email: "test.user@example.com",
     full_name: "Carlos Gómez",
   };
@@ -97,9 +100,39 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.equal(typeof notificationsService.sendExchangeEmail, "function");
     assert.equal(typeof notificationsService.sendDepositEmail, "function");
 
-    // Debe resolver sin lanzar error incluso si AWS SES falla o en sandbox
-    await assert.doesNotReject(async () => {
-      await notificationsService.sendWelcomeEmail(dummyUser);
-    });
+    const originalCreatePending = notificationsRepository.createPending;
+    const originalUpdateResult = notificationsRepository.updateResult;
+    const originalSesConfigured = env.aws.isConfigured;
+    let insertedInput: Parameters<typeof notificationsRepository.createPending>[0] | undefined;
+    let updatedResult: Parameters<typeof notificationsRepository.updateResult>[1] | undefined;
+    notificationsRepository.createPending = async (input) => {
+      insertedInput = input;
+      return "notification-test-id";
+    };
+    notificationsRepository.updateResult = async (_id, result) => {
+      updatedResult = result;
+    };
+    env.aws.isConfigured = false;
+
+    try {
+      await assert.doesNotReject(async () => {
+        await notificationsService.sendWelcomeEmail(dummyUser);
+      });
+      assert.deepEqual(insertedInput, {
+        user_id: dummyUser.id,
+        recipient_email: dummyUser.email,
+        email_type: "welcome",
+        subject: "¡Bienvenido a NexPay! Gracias por registrarte",
+      });
+      assert.deepEqual(updatedResult, {
+        status: "failed",
+        provider_message_id: undefined,
+        error_message: "AWS_SES_NOT_CONFIGURED",
+      });
+    } finally {
+      notificationsRepository.createPending = originalCreatePending;
+      notificationsRepository.updateResult = originalUpdateResult;
+      env.aws.isConfigured = originalSesConfigured;
+    }
   });
 });

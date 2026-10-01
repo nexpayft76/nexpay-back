@@ -193,7 +193,7 @@ export const walletsService = {
     void usersRepository.findById(userId).then((user) => {
       if (user) {
         void notificationsService.sendDepositEmail({
-          user: { email: user.email, full_name: user.full_name },
+          user: { id: user.id, email: user.email, full_name: user.full_name },
           currency: result.currency,
           amount: result.amount,
           new_balance: result.new_balance,

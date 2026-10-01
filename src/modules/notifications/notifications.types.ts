@@ -1,7 +1,10 @@
 export interface NotificationRecipient {
+  id: string;
   email: string;
   full_name: string;
 }
+
+export type NotificationEmailType = "welcome" | "exchange" | "deposit";
 
 export interface WelcomeEmailData {
   user: NotificationRecipient;

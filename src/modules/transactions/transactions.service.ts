@@ -152,7 +152,7 @@ export const transactionsService = {
     void usersRepository.findById(userId).then((user) => {
       if (user) {
         void notificationsService.sendExchangeEmail({
-          user: { email: user.email, full_name: user.full_name },
+          user: { id: user.id, email: user.email, full_name: user.full_name },
           type: result.type,
           from_currency: result.from_currency,
           to_currency: result.to_currency,
