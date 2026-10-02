@@ -93,7 +93,6 @@ export const usersRepository = {
 
     return rows[0] ?? null;
   },
-
   async findAll(): Promise<UserRecord[]> {
     const { rows } = await pool.query<UserRecord>(
       `SELECT id, full_name, email, status, created_at, updated_at
