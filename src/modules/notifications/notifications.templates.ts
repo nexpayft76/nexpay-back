@@ -267,7 +267,7 @@ export function buildExchangeEmail(data: ExchangeNotificationData): { subject: s
     </table>
 
     <div style="text-align: center; margin-bottom: 24px;">
-      <a href="${env.FRONTEND_URL}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 24px; border-radius: 8px;">
+      <a href="${env.frontendAppUrl}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 24px; border-radius: 8px;">
         Ver en mi Billetera
       </a>
     </div>
@@ -349,7 +349,7 @@ export function buildDepositEmail(data: DepositNotificationData): { subject: str
     </table>
 
     <div style="text-align: center; margin-bottom: 24px;">
-      <a href="${env.FRONTEND_URL}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 24px; border-radius: 8px;">
+      <a href="${env.frontendAppUrl}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 24px; border-radius: 8px;">
         Ver Saldo en Billetera
       </a>
     </div>
