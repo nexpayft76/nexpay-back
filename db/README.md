@@ -14,6 +14,7 @@ PostgreSQL en Railway. El esquema vive en este directorio y cambia **solo median
 | `migrations/005_exchange_fees.sql` | Compra/venta/intercambio: columnas `fee_amount`, `fee_currency`, `fee_percent` y `ars_rate_type` en `transactions` | Aplicado |
 | `migrations/006_email_notifications.sql` | Historial de correos por usuario, con estado de envío y referencia del proveedor | Aplicado |
 | `migrations/007_alert_emails.sql` | Reglas de alertas por usuario y registro de emails de alerta | Pendiente de aplicar |
+| `migrations/008_user_theme.sql` | Preferencia de tema claro/oscuro por usuario para personalizar correos | Aplicado |
 
 ## Reglas que el código debe respetar
 

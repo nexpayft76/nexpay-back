@@ -5,30 +5,57 @@ import type {
   NotificationRecipient,
 } from "./notifications.types";
 
+const LIGHT_EMAIL_COLORS: Record<string, string> = {
+  "#0a0a0a": "#faf7f0",
+  "#12110e": "#ffffff",
+  "#050505": "#faf7f0",
+  "#eee2c0": "#17140e",
+  "#d4a64a": "#7a5510",
+  "#1a1206": "#ffffff",
+  "#b3a888": "#4a4234",
+  "#0e0d0b": "#fffdf8",
+  "#3b3020": "#c6b88f",
+  "#2e2410": "#fff6e0",
+  "#8a6a1f": "#e8b44a",
+  "#f2cf7a": "#7a5200",
+  "#4cc38a": "#1a7f4b",
+  "#163326": "#e4f4eb",
+  "#a09683": "#5e5545",
+};
+
+function applyLightEmailPalette(html: string): string {
+  return html.replace(/style="[^"]*"/g, (styleAttribute) =>
+    styleAttribute
+      .replace(/#[\da-f]{3,8}/gi, (color) => LIGHT_EMAIL_COLORS[color.toLowerCase()] ?? color)
+      .replace("rgba(212, 166, 74, 0.22)", "rgba(122, 85, 16, 0.16)")
+      .replace("rgba(0, 0, 0, 0.5)", "rgba(60, 45, 15, 0.1)"),
+  );
+}
+
 /**
  * Envoltorio común para estilos y estructura de los correos HTML de NexPay.
  */
-function emailLayout(title: string, contentHtml: string): string {
-  return `<!DOCTYPE html>
+function emailLayout(title: string, contentHtml: string, theme: "light" | "dark" = "dark"): string {
+  const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 32px 16px;">
+<body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #eee2c0; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0a0a0a; padding: 32px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02); border: 1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+        <table role="presentation" width="100%" style="max-width: 580px; background-color: #12110e; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); border: 1px solid #3b3020;" cellspacing="0" cellpadding="0">
           
           <!-- Encabezado con branding NexPay -->
           <tr>
-            <td style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px 32px 28px; text-align: center;">
+            <td style="background: linear-gradient(135deg, #050505 0%, #12110e 100%); padding: 32px 32px 28px; text-align: center;">
               <div style="display: inline-block;">
-                <span style="font-size: 28px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff;">Nex<span style="color: #38bdf8;">Pay</span></span>
+                <span style="font-size: 28px; font-weight: 800; letter-spacing: -0.5px; color: #eee2c0;">Nex<span style="color: #d4a64a;">Pay</span></span>
               </div>
-              <div style="margin-top: 6px; font-size: 13px; font-weight: 500; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">
+              <div style="margin-top: 6px; font-size: 13px; font-weight: 500; color: #b3a888; text-transform: uppercase; letter-spacing: 1px;">
                 Billetera Digital Multimoneda
               </div>
             </td>
@@ -44,13 +71,13 @@ function emailLayout(title: string, contentHtml: string): string {
           <!-- Aviso de Dinero Ficticio (Mandatorio en toda notificación) -->
           <tr>
             <td style="padding: 0 32px 24px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #fefce8; border: 1px solid #fef08a; border-radius: 10px; padding: 14px 16px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #2e2410; border: 1px solid #8a6a1f; border-radius: 10px; padding: 14px 16px;">
                 <tr>
                   <td>
-                    <div style="font-size: 12px; font-weight: 700; color: #854d0e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                    <div style="font-size: 12px; font-weight: 700; color: #f2cf7a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
                       Entorno de Demostración &bull; Dinero Ficticio
                     </div>
-                    <div style="font-size: 12px; line-height: 1.5; color: #713f12;">
+                    <div style="font-size: 12px; line-height: 1.5; color: #eee2c0;">
                       NexPay opera en modo educativo y de simulación. Todas las operaciones (recargas, compras, ventas o intercambios) se realizan con <strong>saldos ficticios</strong> sin valor comercial ni cargos reales.
                     </div>
                   </td>
@@ -61,7 +88,7 @@ function emailLayout(title: string, contentHtml: string): string {
 
           <!-- Pie de página -->
           <tr>
-            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 32px; text-align: center; font-size: 12px; color: #64748b; line-height: 1.6;">
+            <td style="background-color: #0e0d0b; border-top: 1px solid #3b3020; padding: 24px 32px; text-align: center; font-size: 12px; color: #b3a888; line-height: 1.6;">
               <div style="margin-bottom: 8px;">
                 Has recibido este correo electrónico porque estás registrado en la plataforma NexPay.
               </div>
@@ -77,6 +104,7 @@ function emailLayout(title: string, contentHtml: string): string {
   </table>
 </body>
 </html>`;
+  return theme === "light" ? applyLightEmailPalette(html) : html;
 }
 
 /**
@@ -87,18 +115,18 @@ export function buildWelcomeEmail(user: NotificationRecipient): { subject: strin
   const firstName = user.full_name.split(" ")[0] || user.full_name;
 
   const contentHtml = `
-    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #0f172a;">
+    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #eee2c0;">
       ¡Hola, ${firstName}! 👋
     </h1>
-    <p style="margin: 0 0 18px; font-size: 15px; line-height: 1.6; color: #334155;">
+    <p style="margin: 0 0 18px; font-size: 15px; line-height: 1.6; color: #b3a888;">
       Muchas gracias por crear tu cuenta en <strong>NexPay</strong>. Nos alegra darte la bienvenida a nuestra billetera digital multimoneda.
     </p>
 
-    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-      <h3 style="margin: 0 0 12px; font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">
+    <div style="background-color: #0e0d0b; border: 1px solid #3b3020; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+      <h3 style="margin: 0 0 12px; font-size: 14px; font-weight: 700; color: #eee2c0; text-transform: uppercase; letter-spacing: 0.5px;">
         ¿Qué puedes hacer en tu cuenta?
       </h3>
-      <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.7; color: #475569;">
+      <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.7; color: #b3a888;">
         <li><strong>Billetera multimoneda:</strong> Gestiona saldos en Pesos Colombianos (COP), Pesos Argentinos (ARS), Dólares (USD) y Euros (EUR).</li>
         <li><strong>Cotizaciones en tiempo real:</strong> Consulta tasas oficiales y tipo de cambio para el corredor Colombia &harr; Argentina sin comisiones ocultas.</li>
         <li><strong>Recargas de prueba:</strong> Acredita saldo virtual al instante para practicar todas las operaciones que desees.</li>
@@ -106,12 +134,12 @@ export function buildWelcomeEmail(user: NotificationRecipient): { subject: strin
       </ul>
     </div>
 
-    <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #334155;">
+    <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #b3a888;">
       Tu billetera ha sido inicializada y está lista para que comiences a explorar la plataforma de inmediato.
     </p>
 
     <div style="text-align: center; margin-bottom: 28px;">
-      <a href="${env.FRONTEND_URL}" target="_blank" style="display: inline-block; background-color: #0284c7; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.2);">
+      <a href="${env.FRONTEND_URL}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px; box-shadow: 0 2px 8px rgba(212, 166, 74, 0.22);">
         Ingresar a mi Billetera
       </a>
     </div>
@@ -137,7 +165,7 @@ Recuerda que en NexPay todas las operaciones y saldos son 100% ficticios en modo
 
   return {
     subject,
-    html: emailLayout(subject, contentHtml),
+    html: emailLayout(subject, contentHtml, user.theme),
     text,
   };
 }
@@ -174,14 +202,14 @@ export function buildExchangeEmail(data: ExchangeNotificationData): { subject: s
   const balancesHtml = data.balances
     ? `
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Nuevo saldo ${data.from_currency}</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; font-weight: 600; color: #0f172a; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Nuevo saldo ${data.from_currency}</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; font-weight: 600; color: #eee2c0; text-align: right;">
           ${formatBalance(data.balances.from, 2)} ${data.from_currency}
         </td>
       </tr>
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Nuevo saldo ${data.to_currency}</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; font-weight: 600; color: #0f172a; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Nuevo saldo ${data.to_currency}</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; font-weight: 600; color: #eee2c0; text-align: right;">
           ${formatBalance(data.balances.to, 2)} ${data.to_currency}
         </td>
       </tr>
@@ -194,61 +222,61 @@ export function buildExchangeEmail(data: ExchangeNotificationData): { subject: s
 
   const contentHtml = `
     <div style="margin-bottom: 20px;">
-      <span style="display: inline-block; background-color: #dbeafe; color: #1e40af; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+      <span style="display: inline-block; background-color: #2e2410; color: #f2cf7a; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
         ${operationTitle}
       </span>
     </div>
 
-    <h1 style="margin: 0 0 14px; font-size: 22px; font-weight: 700; color: #0f172a;">
+    <h1 style="margin: 0 0 14px; font-size: 22px; font-weight: 700; color: #eee2c0;">
       ¡Transacción exitosa, ${firstName}!
     </h1>
-    <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #334155;">
+    <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #b3a888;">
       Tu operación de <strong>${operationTitle.toLowerCase()}</strong> ha sido procesada y registrada correctamente en tu billetera.
     </p>
 
     <!-- Tabla de detalles de la transacción -->
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px; overflow: hidden;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0e0d0b; border: 1px solid #3b3020; border-radius: 12px; margin-bottom: 24px; overflow: hidden;">
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Monto debitado (origen)</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 700; color: #0f172a; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Monto debitado (origen)</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 14px; font-weight: 700; color: #eee2c0; text-align: right;">
           ${fromAmount} ${data.from_currency}
         </td>
       </tr>
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Monto acreditado (destino)</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 700; color: #166534; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Monto acreditado (destino)</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 14px; font-weight: 700; color: #4cc38a; text-align: right;">
           +${toAmount} ${data.to_currency}
         </td>
       </tr>
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Tasa de cambio aplicada</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; font-weight: 600; color: #334155; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Tasa de cambio aplicada</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; font-weight: 600; color: #eee2c0; text-align: right;">
           1 ${data.from_currency} = ${data.rate} ${data.to_currency}${data.ars_rate_type ? ` (${data.ars_rate_type})` : ""}
         </td>
       </tr>
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Comisión por operación</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; font-weight: 500; color: #64748b; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Comisión por operación</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; font-weight: 500; color: #b3a888; text-align: right;">
           ${feeAmount} ${data.from_currency} (${data.fee_percent}%)
         </td>
       </tr>
       ${balancesHtml}
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">ID de Transacción</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 12px; font-family: monospace; color: #475569; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">ID de Transacción</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 12px; font-family: monospace; color: #a09683; text-align: right;">
           ${data.transaction_id}
         </td>
       </tr>
       <tr>
-        <td style="padding: 12px 18px; font-size: 13px; color: #64748b;">Fecha y Hora</td>
-        <td style="padding: 12px 18px; font-size: 13px; color: #475569; text-align: right;">
+        <td style="padding: 12px 18px; font-size: 13px; color: #b3a888;">Fecha y Hora</td>
+        <td style="padding: 12px 18px; font-size: 13px; color: #a09683; text-align: right;">
           ${new Date(data.created_at).toLocaleString("es-CO", { timeZone: "America/Bogota" })}
         </td>
       </tr>
     </table>
 
     <div style="text-align: center; margin-bottom: 24px;">
-      <a href="${env.FRONTEND_URL}" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 24px; border-radius: 8px;">
+      <a href="${env.FRONTEND_URL}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 24px; border-radius: 8px;">
         Ver en mi Billetera
       </a>
     </div>
@@ -274,7 +302,7 @@ Esta transacción fue realizada con dinero ficticio en el entorno de pruebas de 
 
   return {
     subject,
-    html: emailLayout(subject, contentHtml),
+    html: emailLayout(subject, contentHtml, data.user.theme),
     text,
   };
 }
@@ -290,48 +318,48 @@ export function buildDepositEmail(data: DepositNotificationData): { subject: str
 
   const contentHtml = `
     <div style="margin-bottom: 20px;">
-      <span style="display: inline-block; background-color: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+      <span style="display: inline-block; background-color: #163326; color: #4cc38a; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
         Recarga Exitosa
       </span>
     </div>
 
-    <h1 style="margin: 0 0 14px; font-size: 22px; font-weight: 700; color: #0f172a;">
+    <h1 style="margin: 0 0 14px; font-size: 22px; font-weight: 700; color: #eee2c0;">
       ¡Saldo acreditado, ${firstName}! 💰
     </h1>
-    <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #334155;">
+    <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #b3a888;">
       Se ha completado con éxito la recarga de saldo simulado en tu billetera NexPay.
     </p>
 
     <!-- Tabla de detalles de la recarga -->
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px; overflow: hidden;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0e0d0b; border: 1px solid #3b3020; border-radius: 12px; margin-bottom: 24px; overflow: hidden;">
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Monto acreditado</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 16px; font-weight: 800; color: #166534; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Monto acreditado</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 16px; font-weight: 800; color: #4cc38a; text-align: right;">
           +${formattedAmount} ${data.currency}
         </td>
       </tr>
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Nuevo saldo disponible</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 700; color: #0f172a; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Nuevo saldo disponible</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 14px; font-weight: 700; color: #eee2c0; text-align: right;">
           ${formattedBalance} ${data.currency}
         </td>
       </tr>
       <tr>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">ID de Transacción</td>
-        <td style="padding: 12px 18px; border-bottom: 1px solid #e2e8f0; font-size: 12px; font-family: monospace; color: #475569; text-align: right;">
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">ID de Transacción</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 12px; font-family: monospace; color: #a09683; text-align: right;">
           ${data.transaction_id}
         </td>
       </tr>
       <tr>
-        <td style="padding: 12px 18px; font-size: 13px; color: #64748b;">Fecha y Hora</td>
-        <td style="padding: 12px 18px; font-size: 13px; color: #475569; text-align: right;">
+        <td style="padding: 12px 18px; font-size: 13px; color: #b3a888;">Fecha y Hora</td>
+        <td style="padding: 12px 18px; font-size: 13px; color: #a09683; text-align: right;">
           ${new Date(data.created_at).toLocaleString("es-CO", { timeZone: "America/Bogota" })}
         </td>
       </tr>
     </table>
 
     <div style="text-align: center; margin-bottom: 24px;">
-      <a href="${env.FRONTEND_URL}" target="_blank" style="display: inline-block; background-color: #0284c7; color: #ffffff; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 24px; border-radius: 8px;">
+      <a href="${env.FRONTEND_URL}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 24px; border-radius: 8px;">
         Ver Saldo en Billetera
       </a>
     </div>
@@ -354,7 +382,7 @@ Esta recarga corresponde a saldo virtual de prueba (modo demo) en la plataforma 
 
   return {
     subject,
-    html: emailLayout(subject, contentHtml),
+    html: emailLayout(subject, contentHtml, data.user.theme),
     text,
   };
 }
@@ -372,14 +400,14 @@ export function buildAlertEmail(data: { user: NotificationRecipient; title: stri
   const message = escapeHtml(data.message);
   const subject = `${data.title} | Alerta de NexPay`;
   const contentHtml = `
-    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #0f172a;">Hola, ${escapeHtml(firstName)}</h1>
-    <p style="margin: 0 0 12px; font-size: 17px; font-weight: 700; color: #0f172a;">${title}</p>
-    <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #334155;">${message}</p>
+    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #eee2c0;">Hola, ${escapeHtml(firstName)}</h1>
+    <p style="margin: 0 0 12px; font-size: 17px; font-weight: 700; color: #d4a64a;">${title}</p>
+    <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #b3a888;">${message}</p>
   `;
 
   return {
     subject,
-    html: emailLayout(title, contentHtml),
+    html: emailLayout(title, contentHtml, data.user.theme),
     text: `Hola, ${firstName}\n\n${data.title}\n${data.message}\n\nHas recibido este correo porque activaste el email para esta alerta en NexPay.`,
   };
 }

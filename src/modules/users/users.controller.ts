@@ -4,6 +4,16 @@ import { DatabaseError } from "pg";
 import { AppError } from "../../utils/app-error";
 import type { UserRecord } from "./users.repository";
 import { usersService } from "./users.service";
+import { getAuth } from "../auth/auth.middlewares";
+
+export async function updateMyTheme(req: Request, res: Response): Promise<void> {
+  const theme = await usersService.updateTheme(getAuth(req).userId, req.body.theme);
+  if (!theme) {
+    res.status(404).json({ error: "USER_NOT_FOUND", message: "Usuario no encontrado" });
+    return;
+  }
+  res.status(200).json({ data: { theme } });
+}
 
 const PG_UNIQUE_VIOLATION = "23505";
 

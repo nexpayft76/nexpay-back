@@ -23,6 +23,7 @@ CREATE TABLE users (
     full_name      VARCHAR(120) NOT NULL,
     email          VARCHAR(255) NOT NULL UNIQUE,
     password_hash  VARCHAR(255) NOT NULL,
+    theme          VARCHAR(5)   NOT NULL DEFAULT 'dark' CHECK (theme IN ('light', 'dark')),
     status         VARCHAR(10)  NOT NULL DEFAULT 'active'
                    CHECK (status IN ('active','suspended','closed')),
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),

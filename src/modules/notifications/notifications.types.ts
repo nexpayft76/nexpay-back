@@ -2,6 +2,7 @@ export interface NotificationRecipient {
   id: string;
   email: string;
   full_name: string;
+  theme?: "light" | "dark";
 }
 
 export type NotificationEmailType = "welcome" | "exchange" | "deposit" | "alert";

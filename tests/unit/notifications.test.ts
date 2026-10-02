@@ -9,6 +9,7 @@ import {
 } from "../../src/modules/notifications/notifications.templates";
 import { notificationsRepository } from "../../src/modules/notifications/notifications.repository";
 import { notificationsService } from "../../src/modules/notifications/notifications.service";
+import { usersRepository } from "../../src/modules/users/users.repository";
 
 describe("Notifications Module - AWS SES Emails", () => {
   const dummyUser = {
@@ -25,6 +26,14 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.ok(email.html.includes("Dinero Ficticio"));
     assert.ok(email.html.includes("Entorno de Demostración"));
     assert.ok(email.text.includes("ficticios en modo de demostración"));
+  });
+
+  it("usa la paleta clara cuando el usuario tiene ese tema activo", () => {
+    const email = buildWelcomeEmail({ ...dummyUser, theme: "light" });
+
+    assert.ok(email.html.includes("background-color: #faf7f0"));
+    assert.ok(email.html.includes("color: #17140e"));
+    assert.ok(!email.html.includes("background-color: #0a0a0a"));
   });
 
   it("2. buildExchangeEmail genera resumen de transacción (compra/venta) con detalles y aviso ficticio", () => {
@@ -117,6 +126,7 @@ describe("Notifications Module - AWS SES Emails", () => {
 
     const originalCreatePending = notificationsRepository.createPending;
     const originalUpdateResult = notificationsRepository.updateResult;
+    const originalGetThemeById = usersRepository.getThemeById;
     const originalSesConfigured = env.aws.isConfigured;
     let insertedInput: Parameters<typeof notificationsRepository.createPending>[0] | undefined;
     let updatedResult: Parameters<typeof notificationsRepository.updateResult>[1] | undefined;
@@ -127,6 +137,7 @@ describe("Notifications Module - AWS SES Emails", () => {
     notificationsRepository.updateResult = async (_id, result) => {
       updatedResult = result;
     };
+    usersRepository.getThemeById = async () => "dark";
     env.aws.isConfigured = false;
 
     try {
@@ -166,6 +177,7 @@ describe("Notifications Module - AWS SES Emails", () => {
     } finally {
       notificationsRepository.createPending = originalCreatePending;
       notificationsRepository.updateResult = originalUpdateResult;
+      usersRepository.getThemeById = originalGetThemeById;
       env.aws.isConfigured = originalSesConfigured;
     }
   });

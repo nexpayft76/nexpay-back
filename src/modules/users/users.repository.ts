@@ -15,7 +15,25 @@ export interface UpdateUserInput {
   status?: "active" | "suspended" | "closed";
 }
 
+export type UserTheme = "light" | "dark";
+
 export const usersRepository = {
+  async getThemeById(id: string): Promise<UserTheme | null> {
+    const { rows } = await pool.query<{ theme: UserTheme }>(
+      `SELECT theme FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+    return rows[0]?.theme ?? null;
+  },
+
+  async updateTheme(id: string, theme: UserTheme): Promise<UserTheme | null> {
+    const { rows } = await pool.query<{ theme: UserTheme }>(
+      `UPDATE users SET theme = $2 WHERE id = $1 AND deleted_at IS NULL RETURNING theme`,
+      [id, theme],
+    );
+    return rows[0]?.theme ?? null;
+  },
+
   async findAll(): Promise<UserRecord[]> {
     const { rows } = await pool.query<UserRecord>(
       `SELECT id, full_name, email, status, created_at, updated_at
