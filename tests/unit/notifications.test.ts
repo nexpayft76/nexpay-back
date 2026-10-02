@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { env } from "../../src/config/env";
 import {
+  buildAlertEmail,
   buildDepositEmail,
   buildExchangeEmail,
   buildWelcomeEmail,
@@ -73,6 +74,19 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.ok(email.text.includes("saldo virtual de prueba"));
   });
 
+  it("buildAlertEmail genera el aviso y escapa el contenido dinámico", () => {
+    const email = buildAlertEmail({
+      user: { ...dummyUser, full_name: "<Carlos>" },
+      title: "Saldo bajo en COP",
+      message: "Tu saldo quedó en 10 COP < 20 COP.",
+    });
+
+    assert.ok(email.subject.includes("Alerta de NexPay"));
+    assert.ok(email.html.includes("&lt;Carlos&gt;"));
+    assert.ok(email.html.includes("10 COP &lt; 20 COP"));
+    assert.ok(email.text.includes("Saldo bajo en COP"));
+  });
+
   it("4. limita los decimales a 2 al mostrar saldos y montos (ej. 12345.6789 -> 12345.68)", () => {
     const depositWithLongDecimals = {
       user: dummyUser,
@@ -99,6 +113,7 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.equal(typeof notificationsService.sendWelcomeEmail, "function");
     assert.equal(typeof notificationsService.sendExchangeEmail, "function");
     assert.equal(typeof notificationsService.sendDepositEmail, "function");
+    assert.equal(typeof notificationsService.sendAlertEmail, "function");
 
     const originalCreatePending = notificationsRepository.createPending;
     const originalUpdateResult = notificationsRepository.updateResult;
@@ -123,6 +138,25 @@ describe("Notifications Module - AWS SES Emails", () => {
         recipient_email: dummyUser.email,
         email_type: "welcome",
         subject: "¡Bienvenido a NexPay! Gracias por registrarte",
+      });
+      assert.deepEqual(updatedResult, {
+        status: "failed",
+        provider_message_id: undefined,
+        error_message: "AWS_SES_NOT_CONFIGURED",
+      });
+
+      await assert.doesNotReject(async () => {
+        await notificationsService.sendAlertEmail({
+          user: dummyUser,
+          title: "Saldo bajo en COP",
+          message: "Tu saldo quedó en 10 COP.",
+        });
+      });
+      assert.deepEqual(insertedInput, {
+        user_id: dummyUser.id,
+        recipient_email: dummyUser.email,
+        email_type: "alert",
+        subject: "Saldo bajo en COP | Alerta de NexPay",
       });
       assert.deepEqual(updatedResult, {
         status: "failed",

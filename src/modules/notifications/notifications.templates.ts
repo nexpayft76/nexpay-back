@@ -358,3 +358,28 @@ Esta recarga corresponde a saldo virtual de prueba (modo demo) en la plataforma 
     text,
   };
 }
+
+export function buildAlertEmail(data: { user: NotificationRecipient; title: string; message: string }): { subject: string; html: string; text: string } {
+  const firstName = data.user.full_name.split(" ")[0] || data.user.full_name;
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+  const title = escapeHtml(data.title);
+  const message = escapeHtml(data.message);
+  const subject = `${data.title} | Alerta de NexPay`;
+  const contentHtml = `
+    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #0f172a;">Hola, ${escapeHtml(firstName)}</h1>
+    <p style="margin: 0 0 12px; font-size: 17px; font-weight: 700; color: #0f172a;">${title}</p>
+    <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #334155;">${message}</p>
+  `;
+
+  return {
+    subject,
+    html: emailLayout(title, contentHtml),
+    text: `Hola, ${firstName}\n\n${data.title}\n${data.message}\n\nHas recibido este correo porque activaste el email para esta alerta en NexPay.`,
+  };
+}

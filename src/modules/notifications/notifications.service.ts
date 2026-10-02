@@ -2,6 +2,7 @@ import { sendEmailWithSes } from "../../integrations/ses.client";
 import { logger } from "../../utils/logger";
 import { notificationsRepository } from "./notifications.repository";
 import {
+  buildAlertEmail,
   buildDepositEmail,
   buildExchangeEmail,
   buildWelcomeEmail,
@@ -9,6 +10,7 @@ import {
 import type {
   DepositNotificationData,
   ExchangeNotificationData,
+  AlertEmailData,
   NotificationEmailType,
   NotificationRecipient,
 } from "./notifications.types";
@@ -129,6 +131,24 @@ export const notificationsService = {
         error: err instanceof Error ? err.message : String(err),
         email: data.user.email,
         transactionId: data.transaction_id,
+      });
+    }
+  },
+
+  async sendAlertEmail(data: AlertEmailData): Promise<void> {
+    try {
+      const email = buildAlertEmail(data);
+      await sendAndRecordEmail({
+        user: data.user,
+        email_type: "alert",
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      });
+    } catch (err) {
+      logger.error("Error al procesar el email de alerta", {
+        error: err instanceof Error ? err.message : String(err),
+        email: data.user.email,
       });
     }
   },

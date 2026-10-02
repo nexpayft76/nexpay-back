@@ -6,7 +6,7 @@ import { swaggerSpec } from "./config/swagger";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
 import { requestLogger } from "./middlewares/request-logger.middleware";
 import { securityHeaders } from "./middlewares/security-headers.middleware";
-import { balancesRouter, currenciesRouter, transactionsRouter, usersRouter, walletsRouter } from "./modules";
+import { alertsRouter, balancesRouter, currenciesRouter, transactionsRouter, usersRouter, walletsRouter } from "./modules";
 import { requireAuth } from "./modules/auth/auth.middlewares";
 import { authRouter } from "./modules/auth/auth.routes";
 import { ratesRouter } from "./modules/rates/rates.routes";
@@ -46,6 +46,7 @@ app.use("/api/wallets", requireAuth, walletsRouter);
 app.use("/api/balances", requireAuth, balancesRouter);
 app.use("/api/currencies", requireAuth, currenciesRouter);
 app.use("/api/transactions", requireAuth, transactionsRouter);
+app.use("/api/alerts", requireAuth, alertsRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

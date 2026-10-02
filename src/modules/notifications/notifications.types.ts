@@ -4,7 +4,7 @@ export interface NotificationRecipient {
   full_name: string;
 }
 
-export type NotificationEmailType = "welcome" | "exchange" | "deposit";
+export type NotificationEmailType = "welcome" | "exchange" | "deposit" | "alert";
 
 export interface WelcomeEmailData {
   user: NotificationRecipient;
@@ -33,4 +33,10 @@ export interface DepositNotificationData {
   new_balance: string;
   transaction_id: string;
   created_at: string;
+}
+
+export interface AlertEmailData {
+  user: NotificationRecipient;
+  title: string;
+  message: string;
 }

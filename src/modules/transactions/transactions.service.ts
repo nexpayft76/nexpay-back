@@ -6,6 +6,7 @@ import { roundTo } from "../../utils/money";
 import { assertSupported, getRateSnapshot, quoteRate, type ArsRateUsed, type RatesSource } from "../rates/rates.service";
 import { usersRepository } from "../users/users.repository";
 import { notificationsService } from "../notifications";
+import { alertsService } from "../alerts/alerts.service";
 import { walletsRepository } from "../wallets/wallets.repository";
 import { transactionsRepository, type TransactionType } from "./transactions.repository";
 
@@ -147,6 +148,11 @@ export const transactionsService = {
       created_at: new Date(record.transaction.created_at).toISOString(),
       balances: record.balances,
     };
+
+    void alertsService.onBalancesChanged(userId, [
+      { currency: result.from_currency, amount: result.balances.from },
+      { currency: result.to_currency, amount: result.balances.to },
+    ], result.transaction_id);
 
     // Envío de email con el resumen de la transacción mediante AWS SES (asíncrono)
     void usersRepository.findById(userId).then((user) => {

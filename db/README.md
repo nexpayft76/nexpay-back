@@ -13,6 +13,7 @@ PostgreSQL en Railway. El esquema vive en este directorio y cambia **solo median
 | `migrations/004_last_known_rates.sql` | Tabla `last_known_rates`: última tasa válida de cada proveedor, para usarla si Frankfurter o DolarApi fallan | Aplicado |
 | `migrations/005_exchange_fees.sql` | Compra/venta/intercambio: columnas `fee_amount`, `fee_currency`, `fee_percent` y `ars_rate_type` en `transactions` | Aplicado |
 | `migrations/006_email_notifications.sql` | Historial de correos por usuario, con estado de envío y referencia del proveedor | Aplicado |
+| `migrations/007_alert_emails.sql` | Reglas de alertas por usuario y registro de emails de alerta | Pendiente de aplicar |
 
 ## Reglas que el código debe respetar
 
