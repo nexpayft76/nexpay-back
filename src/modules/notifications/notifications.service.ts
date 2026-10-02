@@ -1,12 +1,15 @@
 import { sendEmailWithSes } from "../../integrations/ses.client";
 import { logger } from "../../utils/logger";
+import { usersRepository } from "../users/users.repository";
 import { notificationsRepository } from "./notifications.repository";
 import {
+  buildAlertEmail,
   buildDepositEmail,
   buildExchangeEmail,
   buildWelcomeEmail,
 } from "./notifications.templates";
 import type {
+  AlertEmailData,
   DepositNotificationData,
   ExchangeNotificationData,
   NotificationEmailType,
@@ -19,6 +22,14 @@ interface TrackedEmailInput {
   subject: string;
   html: string;
   text: string;
+}
+
+async function userWithSavedTheme(user: NotificationRecipient): Promise<NotificationRecipient> {
+  try {
+    return { ...user, theme: (await usersRepository.getThemeById(user.id)) ?? user.theme ?? "dark" };
+  } catch {
+    return { ...user, theme: user.theme ?? "dark" };
+  }
 }
 
 async function sendAndRecordEmail(input: TrackedEmailInput): Promise<void> {
@@ -73,7 +84,7 @@ export const notificationsService = {
    */
   async sendWelcomeEmail(user: NotificationRecipient): Promise<void> {
     try {
-      const email = buildWelcomeEmail(user);
+      const email = buildWelcomeEmail(await userWithSavedTheme(user));
       await sendAndRecordEmail({
         user,
         email_type: "welcome",
@@ -94,7 +105,7 @@ export const notificationsService = {
    */
   async sendExchangeEmail(data: ExchangeNotificationData): Promise<void> {
     try {
-      const email = buildExchangeEmail(data);
+      const email = buildExchangeEmail({ ...data, user: await userWithSavedTheme(data.user) });
       await sendAndRecordEmail({
         user: data.user,
         email_type: "exchange",
@@ -116,7 +127,7 @@ export const notificationsService = {
    */
   async sendDepositEmail(data: DepositNotificationData): Promise<void> {
     try {
-      const email = buildDepositEmail(data);
+      const email = buildDepositEmail({ ...data, user: await userWithSavedTheme(data.user) });
       await sendAndRecordEmail({
         user: data.user,
         email_type: "deposit",
@@ -129,6 +140,24 @@ export const notificationsService = {
         error: err instanceof Error ? err.message : String(err),
         email: data.user.email,
         transactionId: data.transaction_id,
+      });
+    }
+  },
+
+  async sendAlertEmail(data: AlertEmailData): Promise<void> {
+    try {
+      const email = buildAlertEmail({ ...data, user: await userWithSavedTheme(data.user) });
+      await sendAndRecordEmail({
+        user: data.user,
+        email_type: "alert",
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      });
+    } catch (err) {
+      logger.error("Error al procesar el email de alerta", {
+        error: err instanceof Error ? err.message : String(err),
+        email: data.user.email,
       });
     }
   },

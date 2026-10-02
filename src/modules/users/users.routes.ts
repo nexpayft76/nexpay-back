@@ -1,10 +1,12 @@
 import { Router } from "express";
 
-import { deleteUser, getUser, listUsers, updateUser } from "./users.controller";
-import { validateUpdateUser, validateUserId } from "./users.middlewares";
+import { deleteUser, getUser, listUsers, updateMyTheme, updateUser } from "./users.controller";
+import { validateTheme, validateUpdateUser, validateUserId } from "./users.middlewares";
 import { requireAdmin } from "../auth/auth.middlewares";
 
 export const usersRouter = Router();
+
+usersRouter.patch("/me/theme", validateTheme, updateMyTheme);
 
 /**
  * @openapi

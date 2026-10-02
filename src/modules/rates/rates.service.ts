@@ -244,7 +244,6 @@ export const ratesService = {
     if (snapshot.unavailable.includes(base)) {
       throw new AppError(503, "RATES_UNAVAILABLE", `La tasa de ${base} no está disponible en este momento`);
     }
-
     const rates: Record<string, number> = {};
     for (const { code } of snapshot.currencies) {
       if (code !== base && !snapshot.unavailable.includes(code)) {

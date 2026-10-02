@@ -7,6 +7,7 @@ import { getRateSnapshot, quoteRate, type RatesSource } from "../rates/rates.ser
 import { transactionsRepository } from "../transactions/transactions.repository";
 import { usersRepository } from "../users/users.repository";
 import { notificationsService } from "../notifications";
+import { alertsService } from "../alerts/alerts.service";
 import { walletsRepository } from "./wallets.repository";
 
 /** Máximo por recarga ficticia, en la moneda recargada (evita saldos absurdos en la demo). */
@@ -187,6 +188,13 @@ export const walletsService = {
         new_balance: newBalance,
         created_at: tx.created_at.toISOString(),
       };
+    });
+
+    void alertsService.onDeposit(userId, {
+      transactionId: result.transaction_id,
+      currency: result.currency,
+      amount: result.amount,
+      newBalance: result.new_balance,
     });
 
     // Envío de email con el resumen de recarga de saldo mediante AWS SES (asíncrono)

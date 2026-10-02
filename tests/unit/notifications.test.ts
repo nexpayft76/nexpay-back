@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { env } from "../../src/config/env";
 import {
+  buildAlertEmail,
   buildDepositEmail,
   buildExchangeEmail,
   buildWelcomeEmail,
 } from "../../src/modules/notifications/notifications.templates";
 import { notificationsRepository } from "../../src/modules/notifications/notifications.repository";
 import { notificationsService } from "../../src/modules/notifications/notifications.service";
+import { usersRepository } from "../../src/modules/users/users.repository";
 
 describe("Notifications Module - AWS SES Emails", () => {
   const dummyUser = {
@@ -24,6 +26,14 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.ok(email.html.includes("Dinero Ficticio"));
     assert.ok(email.html.includes("Entorno de Demostración"));
     assert.ok(email.text.includes("ficticios en modo de demostración"));
+  });
+
+  it("usa la paleta clara cuando el usuario tiene ese tema activo", () => {
+    const email = buildWelcomeEmail({ ...dummyUser, theme: "light" });
+
+    assert.ok(email.html.includes("background-color: #faf7f0"));
+    assert.ok(email.html.includes("color: #17140e"));
+    assert.ok(!email.html.includes("background-color: #0a0a0a"));
   });
 
   it("2. buildExchangeEmail genera resumen de transacción (compra/venta) con detalles y aviso ficticio", () => {
@@ -73,6 +83,19 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.ok(email.text.includes("saldo virtual de prueba"));
   });
 
+  it("buildAlertEmail genera el aviso y escapa el contenido dinámico", () => {
+    const email = buildAlertEmail({
+      user: { ...dummyUser, full_name: "<Carlos>" },
+      title: "Saldo bajo en COP",
+      message: "Tu saldo quedó en 10 COP < 20 COP.",
+    });
+
+    assert.ok(email.subject.includes("Alerta de NexPay"));
+    assert.ok(email.html.includes("&lt;Carlos&gt;"));
+    assert.ok(email.html.includes("10 COP &lt; 20 COP"));
+    assert.ok(email.text.includes("Saldo bajo en COP"));
+  });
+
   it("4. limita los decimales a 2 al mostrar saldos y montos (ej. 12345.6789 -> 12345.68)", () => {
     const depositWithLongDecimals = {
       user: dummyUser,
@@ -85,13 +108,10 @@ describe("Notifications Module - AWS SES Emails", () => {
 
     const email = buildDepositEmail(depositWithLongDecimals);
 
-    // Saldo y monto deben mostrarse redondeados a exactamente 2 decimales
     assert.ok(email.html.includes("+50.56 USD"));
     assert.ok(email.html.includes("1234.57 USD"));
     assert.ok(email.text.includes("+50.56 USD"));
     assert.ok(email.text.includes("1234.57 USD"));
-
-    // No debe contener los decimales adicionales sin redondear
     assert.ok(!email.html.includes("1234.5678"));
   });
 
@@ -99,12 +119,15 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.equal(typeof notificationsService.sendWelcomeEmail, "function");
     assert.equal(typeof notificationsService.sendExchangeEmail, "function");
     assert.equal(typeof notificationsService.sendDepositEmail, "function");
+    assert.equal(typeof notificationsService.sendAlertEmail, "function");
 
     const originalCreatePending = notificationsRepository.createPending;
     const originalUpdateResult = notificationsRepository.updateResult;
+    const originalGetThemeById = usersRepository.getThemeById;
     const originalSesConfigured = env.aws.isConfigured;
     let insertedInput: Parameters<typeof notificationsRepository.createPending>[0] | undefined;
     let updatedResult: Parameters<typeof notificationsRepository.updateResult>[1] | undefined;
+
     notificationsRepository.createPending = async (input) => {
       insertedInput = input;
       return "notification-test-id";
@@ -112,6 +135,7 @@ describe("Notifications Module - AWS SES Emails", () => {
     notificationsRepository.updateResult = async (_id, result) => {
       updatedResult = result;
     };
+    usersRepository.getThemeById = async () => "dark";
     env.aws.isConfigured = false;
 
     try {
@@ -129,9 +153,29 @@ describe("Notifications Module - AWS SES Emails", () => {
         provider_message_id: undefined,
         error_message: "AWS_SES_NOT_CONFIGURED",
       });
+
+      await assert.doesNotReject(async () => {
+        await notificationsService.sendAlertEmail({
+          user: dummyUser,
+          title: "Saldo bajo en COP",
+          message: "Tu saldo quedó en 10 COP.",
+        });
+      });
+      assert.deepEqual(insertedInput, {
+        user_id: dummyUser.id,
+        recipient_email: dummyUser.email,
+        email_type: "alert",
+        subject: "Saldo bajo en COP | Alerta de NexPay",
+      });
+      assert.deepEqual(updatedResult, {
+        status: "failed",
+        provider_message_id: undefined,
+        error_message: "AWS_SES_NOT_CONFIGURED",
+      });
     } finally {
       notificationsRepository.createPending = originalCreatePending;
       notificationsRepository.updateResult = originalUpdateResult;
+      usersRepository.getThemeById = originalGetThemeById;
       env.aws.isConfigured = originalSesConfigured;
     }
   });
