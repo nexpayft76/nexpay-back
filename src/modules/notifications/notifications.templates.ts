@@ -48,8 +48,6 @@ function emailLayout(title: string, contentHtml: string, theme: "light" | "dark"
     <tr>
       <td align="center">
         <table role="presentation" width="100%" style="max-width: 580px; background-color: #12110e; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); border: 1px solid #3b3020;" cellspacing="0" cellpadding="0">
-          
-          <!-- Encabezado con branding NexPay -->
           <tr>
             <td style="background: linear-gradient(135deg, #050505 0%, #12110e 100%); padding: 32px 32px 28px; text-align: center;">
               <div style="display: inline-block;">
@@ -60,15 +58,11 @@ function emailLayout(title: string, contentHtml: string, theme: "light" | "dark"
               </div>
             </td>
           </tr>
-
-          <!-- Contenido Principal -->
           <tr>
             <td style="padding: 36px 32px 28px;">
               ${contentHtml}
             </td>
           </tr>
-
-          <!-- Aviso de Dinero Ficticio (Mandatorio en toda notificación) -->
           <tr>
             <td style="padding: 0 32px 24px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #2e2410; border: 1px solid #8a6a1f; border-radius: 10px; padding: 14px 16px;">
@@ -85,8 +79,6 @@ function emailLayout(title: string, contentHtml: string, theme: "light" | "dark"
               </table>
             </td>
           </tr>
-
-          <!-- Pie de página -->
           <tr>
             <td style="background-color: #0e0d0b; border-top: 1px solid #3b3020; padding: 24px 32px; text-align: center; font-size: 12px; color: #b3a888; line-height: 1.6;">
               <div style="margin-bottom: 8px;">
@@ -97,13 +89,13 @@ function emailLayout(title: string, contentHtml: string, theme: "light" | "dark"
               </div>
             </td>
           </tr>
-
         </table>
       </td>
     </tr>
   </table>
 </body>
 </html>`;
+
   return theme === "light" ? applyLightEmailPalette(html) : html;
 }
 
@@ -234,7 +226,6 @@ export function buildExchangeEmail(data: ExchangeNotificationData): { subject: s
       Tu operación de <strong>${operationTitle.toLowerCase()}</strong> ha sido procesada y registrada correctamente en tu billetera.
     </p>
 
-    <!-- Tabla de detalles de la transacción -->
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0e0d0b; border: 1px solid #3b3020; border-radius: 12px; margin-bottom: 24px; overflow: hidden;">
       <tr>
         <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Monto debitado (origen)</td>
@@ -330,7 +321,6 @@ export function buildDepositEmail(data: DepositNotificationData): { subject: str
       Se ha completado con éxito la recarga de saldo simulado en tu billetera NexPay.
     </p>
 
-    <!-- Tabla de detalles de la recarga -->
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0e0d0b; border: 1px solid #3b3020; border-radius: 12px; margin-bottom: 24px; overflow: hidden;">
       <tr>
         <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">Monto acreditado</td>

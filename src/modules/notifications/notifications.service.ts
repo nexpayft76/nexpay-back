@@ -1,7 +1,7 @@
 import { sendEmailWithSes } from "../../integrations/ses.client";
 import { logger } from "../../utils/logger";
-import { notificationsRepository } from "./notifications.repository";
 import { usersRepository } from "../users/users.repository";
+import { notificationsRepository } from "./notifications.repository";
 import {
   buildAlertEmail,
   buildDepositEmail,
@@ -9,9 +9,9 @@ import {
   buildWelcomeEmail,
 } from "./notifications.templates";
 import type {
+  AlertEmailData,
   DepositNotificationData,
   ExchangeNotificationData,
-  AlertEmailData,
   NotificationEmailType,
   NotificationRecipient,
 } from "./notifications.types";

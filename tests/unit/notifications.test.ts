@@ -108,13 +108,10 @@ describe("Notifications Module - AWS SES Emails", () => {
 
     const email = buildDepositEmail(depositWithLongDecimals);
 
-    // Saldo y monto deben mostrarse redondeados a exactamente 2 decimales
     assert.ok(email.html.includes("+50.56 USD"));
     assert.ok(email.html.includes("1234.57 USD"));
     assert.ok(email.text.includes("+50.56 USD"));
     assert.ok(email.text.includes("1234.57 USD"));
-
-    // No debe contener los decimales adicionales sin redondear
     assert.ok(!email.html.includes("1234.5678"));
   });
 
@@ -130,6 +127,7 @@ describe("Notifications Module - AWS SES Emails", () => {
     const originalSesConfigured = env.aws.isConfigured;
     let insertedInput: Parameters<typeof notificationsRepository.createPending>[0] | undefined;
     let updatedResult: Parameters<typeof notificationsRepository.updateResult>[1] | undefined;
+
     notificationsRepository.createPending = async (input) => {
       insertedInput = input;
       return "notification-test-id";
