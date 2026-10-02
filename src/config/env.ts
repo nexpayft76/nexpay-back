@@ -14,6 +14,7 @@ const envSchema = z.object({
     .regex(/^\d+[smhd]$/, "JWT_EXPIRES_IN debe tener el formato <número><s|m|h|d>, ej. 1h")
     .default("1h"),
   FRONTEND_URL: z.string().min(1, "FRONTEND_URL es obligatoria"),
+  FRONTEND_APP_URL: z.url().optional(),
   // Tasas oficiales diarias (USD, EUR, COP). Se usa la v2 porque la v1 no incluye COP.
   FRANKFURTER_BASE_URL: z.url().default("https://api.frankfurter.dev/v2"),
   RATES_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
@@ -58,8 +59,44 @@ function durationToSeconds(value: string): number {
   return Number(value.slice(0, -1)) * SECONDS_PER_UNIT[unit];
 }
 
+export function resolveFrontendAppUrl(
+  frontendUrl: string,
+  appUrl: string | undefined,
+  nodeEnv: "development" | "production" | "test",
+): string {
+  if (appUrl) return new URL(appUrl).origin;
+
+  const concreteOrigins = frontendUrl
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter((origin) => origin && !origin.includes("*"))
+    .filter((origin) => {
+      try {
+        const url = new URL(origin);
+        return url.protocol === "http:" || url.protocol === "https:";
+      } catch {
+        return false;
+      }
+    });
+  const isLocal = (origin: string) => ["localhost", "127.0.0.1", "[::1]"].includes(new URL(origin).hostname);
+  const selectedOrigin =
+    nodeEnv === "production"
+      ? concreteOrigins.find((origin) => new URL(origin).protocol === "https:" && !isLocal(origin)) ??
+        concreteOrigins.find((origin) => !isLocal(origin))
+      : concreteOrigins.find(isLocal) ?? concreteOrigins[0];
+
+  if (!selectedOrigin) {
+    throw new Error("Configura FRONTEND_APP_URL con la URL principal del frontend");
+  }
+
+  return new URL(selectedOrigin).origin;
+}
+
+const frontendAppUrl = resolveFrontendAppUrl(data.FRONTEND_URL, data.FRONTEND_APP_URL, data.NODE_ENV);
+
 export const env = {
   ...data,
+  frontendAppUrl,
   jwtExpiresInSeconds: durationToSeconds(data.JWT_EXPIRES_IN),
   isProduction: data.NODE_ENV === "production",
   demoDepositsEnabled: data.DEMO_DEPOSITS_ENABLED === "true",

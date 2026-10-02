@@ -4,3 +4,4 @@ export { balancesRouter } from "./balances/balances.routes";
 export { currenciesRouter } from "./currencies/currencies.routes";
 export { transactionsRouter } from "./transactions/transactions.routes";
 export { alertsRouter } from "./alerts/alerts.routes";
+export { notificationsRouter } from "./notifications/notifications.routes";

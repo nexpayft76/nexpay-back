@@ -131,7 +131,7 @@ export function buildWelcomeEmail(user: NotificationRecipient): { subject: strin
     </p>
 
     <div style="text-align: center; margin-bottom: 28px;">
-      <a href="${env.FRONTEND_URL}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px; box-shadow: 0 2px 8px rgba(212, 166, 74, 0.22);">
+      <a href="${env.frontendAppUrl}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px; box-shadow: 0 2px 8px rgba(212, 166, 74, 0.22);">
         Ingresar a mi Billetera
       </a>
     </div>
@@ -148,7 +148,7 @@ Con tu nueva cuenta puedes:
 - Comprar, vender e intercambiar divisas al instante.
 
 ACCEDE A TU CUENTA:
-${env.FRONTEND_URL}
+${env.frontendAppUrl}
 
 AVISO DE SIMULACIÓN:
 Recuerda que en NexPay todas las operaciones y saldos son 100% ficticios en modo de demostración. No se maneja ni se requiere dinero real.

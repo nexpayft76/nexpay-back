@@ -3,6 +3,13 @@ import { z } from "zod";
 
 const userStatusSchema = z.enum(["active", "suspended", "closed"]);
 const themeSchema = z.object({ theme: z.enum(["light", "dark"]) }).strict();
+const preferencesSchema = z
+  .object({
+    theme: z.enum(["light", "dark"]).optional(),
+    in_app_notifications: z.boolean().optional(),
+    email_notifications: z.boolean().optional(),
+  })
+  .strict();
 
 export function validateTheme(req: Request, res: Response, next: NextFunction): void {
   const result = themeSchema.safeParse(req.body);
@@ -10,6 +17,23 @@ export function validateTheme(req: Request, res: Response, next: NextFunction): 
     res.status(400).json({
       error: "INVALID_THEME",
       message: "El tema debe ser light o dark",
+    });
+    return;
+  }
+  req.body = result.data;
+  next();
+}
+
+export function validatePreferences(req: Request, res: Response, next: NextFunction): void {
+  const result = preferencesSchema.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({
+      error: "INVALID_PREFERENCES",
+      message: "Las preferencias del usuario son inválidas",
+      details: result.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
     });
     return;
   }

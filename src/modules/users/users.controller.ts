@@ -6,6 +6,30 @@ import type { UserRecord } from "./users.repository";
 import { usersService } from "./users.service";
 import { getAuth } from "../auth/auth.middlewares";
 
+export async function getMyTheme(req: Request, res: Response): Promise<void> {
+  const theme = await usersService.getThemeById(getAuth(req).userId);
+  if (!theme) {
+    res.status(404).json({ error: "USER_NOT_FOUND", message: "Usuario no encontrado" });
+    return;
+  }
+  res.status(200).json({ data: { theme } });
+}
+
+export async function getMyPreferences(req: Request, res: Response): Promise<void> {
+  const preferences = await usersService.getPreferencesById(getAuth(req).userId);
+  if (!preferences) {
+    res.status(404).json({ error: "USER_NOT_FOUND", message: "Usuario no encontrado" });
+    return;
+  }
+  res.status(200).json({
+    data: {
+      theme: preferences.theme,
+      in_app_notifications: preferences.in_app_notifications,
+      email_notifications: preferences.email_notifications,
+    },
+  });
+}
+
 export async function updateMyTheme(req: Request, res: Response): Promise<void> {
   const theme = await usersService.updateTheme(getAuth(req).userId, req.body.theme);
   if (!theme) {
@@ -13,6 +37,21 @@ export async function updateMyTheme(req: Request, res: Response): Promise<void> 
     return;
   }
   res.status(200).json({ data: { theme } });
+}
+
+export async function updateMyPreferences(req: Request, res: Response): Promise<void> {
+  const preferences = await usersService.updatePreferences(getAuth(req).userId, req.body);
+  if (!preferences) {
+    res.status(404).json({ error: "USER_NOT_FOUND", message: "Usuario no encontrado" });
+    return;
+  }
+  res.status(200).json({
+    data: {
+      theme: preferences.theme,
+      in_app_notifications: preferences.in_app_notifications,
+      email_notifications: preferences.email_notifications,
+    },
+  });
 }
 
 const PG_UNIQUE_VIOLATION = "23505";

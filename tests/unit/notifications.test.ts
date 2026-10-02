@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { env } from "../../src/config/env";
+import { env, resolveFrontendAppUrl } from "../../src/config/env";
 import {
   buildAlertEmail,
   buildDepositEmail,
@@ -26,6 +26,22 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.ok(email.html.includes("Dinero Ficticio"));
     assert.ok(email.html.includes("Entorno de Demostración"));
     assert.ok(email.text.includes("ficticios en modo de demostración"));
+    const link = email.html.match(/<a href="([^"]+)"/)?.[1];
+    assert.equal(link, env.frontendAppUrl);
+    assert.ok(link && !link.includes(","));
+    assert.ok(email.text.includes(`ACCEDE A TU CUENTA:\n${env.frontendAppUrl}`));
+  });
+
+  it("elige un único enlace local o deployado a partir de los orígenes CORS", () => {
+    const origins = "https://nexpay-front.vercel.app,https://nexpay-front-*.vercel.app,http://localhost:5173";
+
+    assert.equal(resolveFrontendAppUrl(origins, undefined, "development"), "http://localhost:5173");
+    assert.equal(resolveFrontendAppUrl(origins, undefined, "production"), "https://nexpay-front.vercel.app");
+    assert.equal(resolveFrontendAppUrl(origins, "https://custom.example.com/", "production"), "https://custom.example.com");
+    assert.throws(
+      () => resolveFrontendAppUrl("https://nexpay-front-*.vercel.app,http://localhost:5173", undefined, "production"),
+      /FRONTEND_APP_URL/,
+    );
   });
 
   it("usa la paleta clara cuando el usuario tiene ese tema activo", () => {
