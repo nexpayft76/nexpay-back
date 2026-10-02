@@ -4,6 +4,8 @@ import type { ArsRateType } from "../../integrations/dolarapi.client";
 import { AppError } from "../../utils/app-error";
 import { roundTo } from "../../utils/money";
 import { assertSupported, getRateSnapshot, quoteRate, type ArsRateUsed, type RatesSource } from "../rates/rates.service";
+import { usersRepository } from "../users/users.repository";
+import { notificationsService } from "../notifications";
 import { walletsRepository } from "../wallets/wallets.repository";
 import { transactionsRepository, type TransactionType } from "./transactions.repository";
 
@@ -139,11 +141,34 @@ export const transactionsService = {
       }),
     );
 
-    return {
+    const result: ExchangeResult = {
       ...quote,
       transaction_id: record.transaction.id,
       created_at: new Date(record.transaction.created_at).toISOString(),
       balances: record.balances,
     };
+
+    // Envío de email con el resumen de la transacción mediante AWS SES (asíncrono)
+    void usersRepository.findById(userId).then((user) => {
+      if (user) {
+        void notificationsService.sendExchangeEmail({
+          user: { id: user.id, email: user.email, full_name: user.full_name },
+          type: result.type,
+          from_currency: result.from_currency,
+          to_currency: result.to_currency,
+          from_amount: result.from_amount,
+          to_amount: result.to_amount,
+          rate: result.rate,
+          fee_amount: result.fee_amount,
+          fee_percent: result.fee_percent,
+          transaction_id: result.transaction_id,
+          created_at: result.created_at,
+          ars_rate_type: result.ars_rate?.type ?? null,
+          balances: result.balances,
+        });
+      }
+    });
+
+    return result;
   },
 };

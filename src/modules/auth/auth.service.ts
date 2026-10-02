@@ -5,6 +5,7 @@ import { DatabaseError } from "pg";
 import { withTransaction } from "../../config/db";
 import { env } from "../../config/env";
 import { AppError } from "../../utils/app-error";
+import { notificationsService } from "../notifications";
 import { authRepository, type AuthUserRecord } from "./auth.repository";
 import { revokeToken } from "./auth.token-blacklist";
 import type { AuthContext, AuthResult, PublicUser } from "./auth.types";
@@ -65,6 +66,14 @@ export const authService = {
         await authRepository.createInitialBalances(client, walletId);
         return created;
       });
+
+      // Envío de email de bienvenida y agradecimiento por registrarse (asíncrono)
+      void notificationsService.sendWelcomeEmail({
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+      });
+
       return issueToken(user);
     } catch (err) {
       // La restricción UNIQUE(email) de la BD es la fuente de verdad (evita carreras entre peticiones).
