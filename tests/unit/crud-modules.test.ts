@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { usersRouter } from "../../src/modules/users/users.routes";
 import { walletsRouter } from "../../src/modules/wallets/wallets.routes";
 import { currenciesRouter } from "../../src/modules/currencies/currencies.routes";
+import { notificationsRouter } from "../../src/modules/notifications/notifications.routes";
 
 describe("CRUD modules", () => {
   it("should expose the users router", () => {
@@ -16,5 +17,9 @@ describe("CRUD modules", () => {
 
   it("should expose the currencies router", () => {
     assert.ok(currenciesRouter);
+  });
+
+  it("should expose the notifications router", () => {
+    assert.ok(notificationsRouter);
   });
 });

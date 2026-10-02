@@ -19,16 +19,18 @@ INSERT INTO currencies (code, name, decimals) VALUES
 
 -- Usuarios, con borrado lógico (deleted_at).
 CREATE TABLE users (
-    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    full_name      VARCHAR(120) NOT NULL,
-    email          VARCHAR(255) NOT NULL UNIQUE,
-    password_hash  VARCHAR(255) NOT NULL,
-    theme          VARCHAR(5)   NOT NULL DEFAULT 'dark' CHECK (theme IN ('light', 'dark')),
-    status         VARCHAR(10)  NOT NULL DEFAULT 'active'
-                   CHECK (status IN ('active','suspended','closed')),
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    updated_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    deleted_at     TIMESTAMPTZ
+    id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    full_name              VARCHAR(120) NOT NULL,
+    email                  VARCHAR(255) NOT NULL UNIQUE,
+    password_hash          VARCHAR(255) NOT NULL,
+    theme                  VARCHAR(5)   NOT NULL DEFAULT 'dark' CHECK (theme IN ('light', 'dark')),
+    in_app_notifications   BOOLEAN      NOT NULL DEFAULT TRUE,
+    email_notifications    BOOLEAN      NOT NULL DEFAULT FALSE,
+    status                 VARCHAR(10)  NOT NULL DEFAULT 'active'
+                           CHECK (status IN ('active','suspended','closed')),
+    created_at             TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at             TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    deleted_at             TIMESTAMPTZ
 );
 
 -- Una wallet por usuario (1:1).

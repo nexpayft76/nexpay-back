@@ -40,6 +40,37 @@ function getSesClient(): SESClient | null {
  * Si AWS SES no está configurado (por ejemplo, en desarrollo sin credenciales),
  * simula el envío registrándolo en los logs sin interrumpir la operación del usuario.
  */
+function explainAwsSesError(error: unknown): { code: string; message: string } {
+  const value = error instanceof Error ? error.message : String(error);
+  const normalized = value.toLowerCase();
+
+  if (normalized.includes("email address not verified") || normalized.includes("identity not verified")) {
+    return {
+      code: "AWS_SES_IDENTITY_NOT_VERIFIED",
+      message: "La identidad remitente de SES no está verificada en AWS. Verifica el email o dominio configurado en SES.",
+    };
+  }
+
+  if (normalized.includes("not authorized") || normalized.includes("access denied") || normalized.includes("forbidden")) {
+    return {
+      code: "AWS_SES_PERMISSION_DENIED",
+      message: "La cuenta de AWS no tiene permisos para enviar por SES. Revisa el IAM y el usuario asociado.",
+    };
+  }
+
+  if (normalized.includes("invalid client token") || normalized.includes("signature does not match")) {
+    return {
+      code: "AWS_SES_INVALID_CREDENTIALS",
+      message: "Las credenciales de AWS no son válidas o expiraron. Revisa AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY.",
+    };
+  }
+
+  return {
+    code: "AWS_SES_SEND_FAILED",
+    message: value,
+  };
+}
+
 export async function sendEmailWithSes(payload: SendEmailPayload): Promise<SendEmailResult> {
   const client = getSesClient();
 
@@ -88,16 +119,17 @@ export async function sendEmailWithSes(payload: SendEmailPayload): Promise<SendE
       messageId: response.MessageId,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const parsed = explainAwsSesError(error);
     logger.error("Error al enviar email a través de AWS SES", {
-      error: errorMessage,
+      code: parsed.code,
+      hint: parsed.message,
       to: payload.to,
       subject: payload.subject,
     });
 
     return {
       success: false,
-      error: errorMessage,
+      error: parsed.code,
     };
   }
 }

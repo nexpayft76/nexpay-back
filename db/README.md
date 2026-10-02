@@ -15,6 +15,7 @@ PostgreSQL en Railway. El esquema vive en este directorio y cambia **solo median
 | `migrations/006_email_notifications.sql` | Historial de correos por usuario, con estado de envío y referencia del proveedor | Aplicado |
 | `migrations/007_alert_emails.sql` | Reglas de alertas por usuario y registro de emails de alerta | Pendiente de aplicar |
 | `migrations/008_user_theme.sql` | Preferencia de tema claro/oscuro por usuario para personalizar correos | Aplicado |
+| `migrations/009_user_notification_preferences.sql` | Preferencias de alertas y avisos por usuario, persistidas por cuenta | Pendiente de aplicar |
 
 ## Reglas que el código debe respetar
 

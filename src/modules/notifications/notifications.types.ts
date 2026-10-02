@@ -41,3 +41,24 @@ export interface AlertEmailData {
   title: string;
   message: string;
 }
+
+export type UserNotificationType = "rate_alert" | "system";
+
+export interface UserNotification {
+  id: string;
+  user_id: string;
+  type: UserNotificationType;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+  alert_id?: string | null;
+}
+
+export interface CreateUserNotificationInput {
+  type: UserNotificationType;
+  title: string;
+  message: string;
+  read?: boolean;
+  alert_id?: string | null;
+}

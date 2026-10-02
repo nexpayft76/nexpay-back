@@ -1,12 +1,24 @@
 import { Router } from "express";
 
-import { deleteUser, getUser, listUsers, updateMyTheme, updateUser } from "./users.controller";
-import { validateTheme, validateUpdateUser, validateUserId } from "./users.middlewares";
-import { requireAdmin } from "../auth/auth.middlewares";
+import {
+  deleteUser,
+  getMyPreferences,
+  getMyTheme,
+  getUser,
+  listUsers,
+  updateMyPreferences,
+  updateMyTheme,
+  updateUser,
+} from "./users.controller";
+import { validatePreferences, validateTheme, validateUpdateUser, validateUserId } from "./users.middlewares";
+import { requireAdmin, requireAuth } from "../auth/auth.middlewares";
 
 export const usersRouter = Router();
 
-usersRouter.patch("/me/theme", validateTheme, updateMyTheme);
+usersRouter.get("/me/theme", requireAuth, getMyTheme);
+usersRouter.patch("/me/theme", requireAuth, validateTheme, updateMyTheme);
+usersRouter.get("/me/preferences", requireAuth, getMyPreferences);
+usersRouter.patch("/me/preferences", requireAuth, validatePreferences, updateMyPreferences);
 
 /**
  * @openapi
