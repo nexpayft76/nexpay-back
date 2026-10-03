@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createAlertSchema, updateAlertSchema } from "../../src/modules/alerts/alerts.schemas";
-import { matchesDirection } from "../../src/modules/alerts/alerts.service";
+import { formatAlertNumber, matchesDirection } from "../../src/modules/alerts/alerts.service";
 
 describe("Alerts module", () => {
   it("validates checkbox preference as a boolean in create and update payloads", () => {
@@ -25,5 +25,25 @@ describe("Alerts module", () => {
     assert.equal(matchesDirection("up", 1.9, 2), false);
     assert.equal(matchesDirection("down", -2.1, -2), true);
     assert.equal(matchesDirection("down", -1.9, -2), false);
+  });
+
+  it("accepts thresholds with at most two decimals", () => {
+    const input = {
+      kind: "target_rate",
+      currency: "EUR",
+      base_currency: "USD",
+      direction: "up",
+      email_enabled: true,
+    };
+
+    assert.equal(createAlertSchema.safeParse({ ...input, threshold: 1.2 }).success, true);
+    assert.equal(createAlertSchema.safeParse({ ...input, threshold: 1.234 }).success, false);
+    assert.equal(updateAlertSchema.safeParse({ threshold: 1.234 }).success, false);
+  });
+
+  it("formats alert values with exactly two decimals", () => {
+    assert.equal(formatAlertNumber(1), "1.00");
+    assert.equal(formatAlertNumber("1.2"), "1.20");
+    assert.equal(formatAlertNumber("1.234"), "1.23");
   });
 });

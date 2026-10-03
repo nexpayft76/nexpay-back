@@ -37,6 +37,17 @@ const envSchema = z.object({
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   SES_FROM_EMAIL: z.string().email().default("nexpay.team@gmail.com"),
+  // Asistente con IA (OpenRouter). Sin key, el asistente responde "no disponible" y el resto de la API sigue igual.
+  OPENROUTER_API_KEY: z.string().optional(),
+  // Modelos a usar, en orden de preferencia y separados por coma. Si uno se queda sin cupo o falla,
+  // se pasa al siguiente. Por defecto, modelos gratis (terminan en ":free"); la lista cambia seguido:
+  // ver https://openrouter.ai/models (filtro "FREE").
+  OPENROUTER_MODELS: z
+    .string()
+    .default(
+      "qwen/qwen3.8-27b:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-super-120b-a12b:free,google/gemma-4-26b-a4b-it:free",
+    ),
+  OPENROUTER_BASE_URL: z.url().default("https://openrouter.ai/api/v1"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -62,6 +73,9 @@ function durationToSeconds(value: string): number {
 export const env = {
   ...data,
   frontendAppUrl: data.FRONTEND_APP_URL,
+  openRouterModels: data.OPENROUTER_MODELS.split(",")
+    .map((model) => model.trim())
+    .filter(Boolean),
   jwtExpiresInSeconds: durationToSeconds(data.JWT_EXPIRES_IN),
   isProduction: data.NODE_ENV === "production",
   demoDepositsEnabled: data.DEMO_DEPOSITS_ENABLED === "true",

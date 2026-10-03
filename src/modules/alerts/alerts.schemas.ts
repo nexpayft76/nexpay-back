@@ -6,7 +6,11 @@ const alertFields = {
   currency: z.string().trim().min(3).max(10),
   base_currency: z.string().trim().min(3).max(10),
   direction: z.enum(["up", "down"]),
-  threshold: z.number().finite().nonnegative(),
+  threshold: z
+    .number()
+    .finite()
+    .nonnegative()
+    .refine((value) => Number(value.toFixed(2)) === value, "El umbral admite como máximo 2 decimales"),
   email_enabled: z.boolean(),
 };
 
