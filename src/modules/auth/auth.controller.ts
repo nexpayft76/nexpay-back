@@ -24,6 +24,18 @@ export async function login(req: Request, res: Response): Promise<void> {
   res.status(200).json({ data: result });
 }
 
+export async function requestPasswordReset(req: Request, res: Response): Promise<void> {
+  await authService.requestPasswordReset(req.body.email);
+  res.status(200).json({
+    data: { message: "Si el correo está registrado, recibirás instrucciones para restablecer tu contraseña." },
+  });
+}
+
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  await authService.resetPassword(req.body.token, req.body.new_password);
+  res.status(200).json({ data: { message: "La contraseña se actualizó correctamente." } });
+}
+
 /** Cierra la sesión: invalida el token si todavía servía y borra la cookie. Nunca responde 401. */
 export function logout(req: Request, res: Response): void {
   if (req.auth) authService.logout(req.auth);

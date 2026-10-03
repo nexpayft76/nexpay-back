@@ -5,7 +5,7 @@ export interface NotificationRecipient {
   theme?: "light" | "dark";
 }
 
-export type NotificationEmailType = "welcome" | "exchange" | "deposit" | "alert";
+export type NotificationEmailType = "welcome" | "exchange" | "deposit" | "alert" | "password_changed" | "password_reset";
 
 export interface WelcomeEmailData {
   user: NotificationRecipient;

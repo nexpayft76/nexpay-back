@@ -43,6 +43,12 @@ const loginSchema = z.object({
   password: z.string({ error: "La contraseña es obligatoria" }).min(1, "La contraseña es obligatoria"),
 });
 
+const passwordResetRequestSchema = z.object({ email: emailSchema });
+const passwordResetSchema = z.object({
+  token: z.string().regex(/^[a-f\d]{64}$/i, "El enlace de restablecimiento no es válido"),
+  new_password: newPasswordSchema,
+});
+
 /** Valida el body con zod. Si falla, responde 400 con el mismo formato que el resto de módulos. */
 export function validateBody(schema: z.ZodType, errorCode: string, message: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -81,6 +87,16 @@ export function parseEmailQuery(query: unknown): string {
 
 export const validateRegister = validateBody(registerSchema, "INVALID_REGISTER_PAYLOAD", "Datos de registro inválidos");
 export const validateLogin = validateBody(loginSchema, "INVALID_LOGIN_PAYLOAD", "Datos de inicio de sesión inválidos");
+export const validatePasswordResetRequest = validateBody(
+  passwordResetRequestSchema,
+  "INVALID_PASSWORD_RESET_REQUEST",
+  "Email inválido",
+);
+export const validatePasswordReset = validateBody(
+  passwordResetSchema,
+  "INVALID_PASSWORD_RESET",
+  "Datos de restablecimiento inválidos",
+);
 
 // ---------- Protección de rutas ----------
 

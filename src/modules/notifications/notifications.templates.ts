@@ -162,6 +162,86 @@ Recuerda que en NexPay todas las operaciones y saldos son 100% ficticios en modo
   };
 }
 
+export function buildPasswordChangedEmail(user: NotificationRecipient): { subject: string; html: string; text: string } {
+  const subject = "Se cambió la contraseña de tu cuenta NexPay";
+  const firstName = user.full_name.split(" ")[0] || user.full_name;
+  const escapedFirstName = firstName.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+  const contentHtml = `
+    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #eee2c0;">
+      Hola, ${escapedFirstName}
+    </h1>
+    <p style="margin: 0 0 18px; font-size: 15px; line-height: 1.6; color: #b3a888;">
+      Te avisamos que la contraseña de tu cuenta NexPay se cambió correctamente.
+    </p>
+    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #b3a888;">
+      Si no realizaste este cambio, protege tu cuenta y comunícate con el equipo de soporte.
+    </p>
+  `;
+
+  return {
+    subject,
+    html: emailLayout(subject, contentHtml, user.theme),
+    text: `Hola, ${firstName}
+
+Te avisamos que la contraseña de tu cuenta NexPay se cambió correctamente.
+
+Si no realizaste este cambio, protege tu cuenta y comunícate con el equipo de soporte.
+
+© ${new Date().getFullYear()} NexPay`,
+  };
+}
+
+export function buildPasswordResetEmail(data: {
+  user: NotificationRecipient;
+  resetUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = "Restablece tu contraseña de NexPay";
+  const firstName = data.user.full_name.split(" ")[0] || data.user.full_name;
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+  const resetUrl = escapeHtml(data.resetUrl);
+  const contentHtml = `
+    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #eee2c0;">
+      Hola, ${escapeHtml(firstName)}
+    </h1>
+    <p style="margin: 0 0 18px; font-size: 15px; line-height: 1.6; color: #b3a888;">
+      Recibimos una solicitud para cambiar la contraseña de tu cuenta NexPay. Usa el siguiente enlace para crear una nueva:
+    </p>
+    <div style="text-align: center; margin-bottom: 24px;">
+      <a href="${resetUrl}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px;">
+        Cambiar mi contraseña
+      </a>
+    </div>
+    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #b3a888;">
+      El enlace vence en una hora y solo puede usarse una vez. Si no solicitaste este cambio, puedes ignorar este correo.
+    </p>
+  `;
+
+  return {
+    subject,
+    html: emailLayout(subject, contentHtml, data.user.theme),
+    text: `Hola, ${firstName}
+
+Recibimos una solicitud para cambiar la contraseña de tu cuenta NexPay. Visita este enlace para crear una nueva:
+${data.resetUrl}
+
+El enlace vence en una hora y solo puede usarse una vez. Si no solicitaste este cambio, puedes ignorar este correo.
+
+© ${new Date().getFullYear()} NexPay`,
+  };
+}
+
 /**
  * Limita los decimales a 2 al mostrar cualquier saldo o monto monetario en el correo.
  * Ejemplo: "1500000.4567" -> "1500000.46", "100" -> "100.00"
