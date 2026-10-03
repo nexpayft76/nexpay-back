@@ -79,6 +79,7 @@ La lista completa, con ejemplos, está en **`/docs`**.
 | GET | `/api/auth/me` | ✔ | Usuario autenticado |
 | GET | `/api/auth/email-available?email=` | — | ¿Email libre? (máx. 20/min por IP) |
 | PATCH | `/api/users/me` | ✔ | Editar mi nombre y/o email (solo esos campos; 409 si el email ya existe) |
+| PATCH | `/api/users/me/password` | ✔ | Cambiar mi contraseña: pide la actual (403 si es incorrecta) y la nueva sigue las reglas del registro |
 | DELETE | `/api/users/me` | ✔ | Cerrar mi cuenta: pide la contraseña (403 si es incorrecta), exige saldos en 0 (409) y cierra la sesión |
 | GET | `/api/rates?base=USD` | — | Tabla de tasas |
 | GET | `/api/rates/convert?from&to&amount&ars_rate` | — | Conversión (cotizador) |

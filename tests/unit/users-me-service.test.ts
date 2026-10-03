@@ -154,3 +154,50 @@ describe("usersService.closeMyAccount", () => {
     assert.equal(isTokenRevoked(auth.jti), true);
   });
 });
+
+describe("usersService.changeMyPassword", () => {
+  const NEW_PASSWORD = "NuevaSecreta456";
+
+  beforeEach(() => {
+    mock.method(authRepository, "findActiveById", async () => authUser());
+  });
+  afterEach(() => mock.restoreAll());
+
+  it("guarda un hash bcrypt de la nueva contraseña (nunca el texto plano)", async () => {
+    const save = mock.method(usersRepository, "updatePasswordHash", async () => true);
+
+    await usersService.changeMyPassword(profile.id, PASSWORD, NEW_PASSWORD);
+
+    const [id, hash] = save.mock.calls[0].arguments;
+    assert.equal(id, profile.id);
+    assert.notEqual(hash, NEW_PASSWORD);
+    assert.equal(await bcrypt.compare(NEW_PASSWORD, hash), true);
+  });
+
+  it("con la contraseña actual incorrecta responde 403 INVALID_PASSWORD y no guarda", async () => {
+    const save = mock.method(usersRepository, "updatePasswordHash", async () => true);
+    await assertAppError(usersService.changeMyPassword(profile.id, "Incorrecta1", NEW_PASSWORD), 403, "INVALID_PASSWORD");
+    assert.equal(save.mock.callCount(), 0);
+  });
+
+  it("si la nueva es igual a la actual responde 400 PASSWORD_UNCHANGED y no guarda", async () => {
+    const save = mock.method(usersRepository, "updatePasswordHash", async () => true);
+    await assertAppError(usersService.changeMyPassword(profile.id, PASSWORD, PASSWORD), 400, "PASSWORD_UNCHANGED");
+    assert.equal(save.mock.callCount(), 0);
+  });
+
+  it("en una cuenta sin contraseña (Google) responde 409 PASSWORD_NOT_SET", async () => {
+    mock.restoreAll();
+    mock.method(authRepository, "findActiveById", async () => authUser({ password_hash: null }));
+    await assertAppError(usersService.changeMyPassword(profile.id, PASSWORD, NEW_PASSWORD), 409, "PASSWORD_NOT_SET");
+  });
+
+  it("responde 401 si el usuario no existe o desaparece al guardar", async () => {
+    mock.method(usersRepository, "updatePasswordHash", async () => false);
+    await assertAppError(usersService.changeMyPassword(profile.id, PASSWORD, NEW_PASSWORD), 401, "UNAUTHORIZED");
+
+    mock.restoreAll();
+    mock.method(authRepository, "findActiveById", async () => null);
+    await assertAppError(usersService.changeMyPassword(profile.id, PASSWORD, NEW_PASSWORD), 401, "UNAUTHORIZED");
+  });
+});

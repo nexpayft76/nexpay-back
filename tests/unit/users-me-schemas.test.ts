@@ -1,7 +1,7 @@
 import "../helpers/test-env";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { closeAccountSchema, updateMeSchema } from "../../src/modules/users/users.middlewares";
+import { changePasswordSchema, closeAccountSchema, updateMeSchema } from "../../src/modules/users/users.middlewares";
 
 describe("PATCH /users/me: esquema", () => {
   it("acepta nombre, email o ambos", () => {
@@ -54,5 +54,29 @@ describe("DELETE /users/me: esquema", () => {
 
   it("no acepta campos extra", () => {
     assert.equal(closeAccountSchema.safeParse({ password: "Secreta123", force: true }).success, false);
+  });
+});
+
+describe("PATCH /users/me/password: esquema", () => {
+  const valid = { current_password: "Secreta123", new_password: "NuevaSecreta456" };
+
+  it("acepta la contraseña actual y una nueva válida", () => {
+    assert.equal(changePasswordSchema.safeParse(valid).success, true);
+  });
+
+  it("exige ambos campos", () => {
+    assert.equal(changePasswordSchema.safeParse({ new_password: valid.new_password }).success, false);
+    assert.equal(changePasswordSchema.safeParse({ current_password: valid.current_password }).success, false);
+    assert.equal(changePasswordSchema.safeParse({ ...valid, current_password: "" }).success, false);
+  });
+
+  it("aplica las reglas del registro a la nueva contraseña", () => {
+    for (const bad of ["Corta1", "sololetrasaqui", "12345678", "a1".repeat(37)]) {
+      assert.equal(changePasswordSchema.safeParse({ ...valid, new_password: bad }).success, false, bad);
+    }
+  });
+
+  it("rechaza campos desconocidos", () => {
+    assert.equal(changePasswordSchema.safeParse({ ...valid, status: "active" }).success, false);
   });
 });

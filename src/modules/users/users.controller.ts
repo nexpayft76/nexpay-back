@@ -68,6 +68,12 @@ export async function closeMyAccount(req: Request, res: Response): Promise<void>
   res.status(204).send();
 }
 
+/** Cambia la contraseña del usuario con la sesión iniciada (pide la actual). */
+export async function changeMyPassword(req: Request, res: Response): Promise<void> {
+  await usersService.changeMyPassword(getAuth(req).userId, req.body.current_password, req.body.new_password);
+  res.status(204).send();
+}
+
 const PG_UNIQUE_VIOLATION = "23505";
 
 export async function listUsers(_req: Request, res: Response): Promise<void> {

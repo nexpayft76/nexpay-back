@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import {
+  changeMyPassword,
   closeMyAccount,
   deleteUser,
   getMyPreferences,
@@ -13,6 +14,7 @@ import {
   updateUser,
 } from "./users.controller";
 import {
+  validateChangePassword,
   validateCloseAccount,
   validatePreferences,
   validateTheme,
@@ -71,6 +73,49 @@ usersRouter.patch("/me/preferences", requireAuth, validatePreferences, updateMyP
  *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
  */
 usersRouter.patch("/me", rateLimit({ windowMs: 60_000, max: 20 }), validateUpdateMe, updateMe);
+
+/**
+ * @openapi
+ * /api/users/me/password:
+ *   patch:
+ *     summary: Cambia la contraseña del usuario autenticado
+ *     description: |
+ *       Pide la contraseña actual para confirmar. La nueva sigue las mismas reglas del registro
+ *       (8-72 caracteres, al menos una letra y un número) y debe ser distinta de la actual.
+ *       La contraseña actual incorrecta responde **403** (no 401), para que el front no lo confunda con una sesión vencida.
+ *       La sesión actual sigue vigente.
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [current_password, new_password]
+ *             properties:
+ *               current_password: { type: string, example: "Secreta123" }
+ *               new_password: { type: string, minLength: 8, maxLength: 72, example: "NuevaSecreta456" }
+ *     responses:
+ *       204:
+ *         description: Contraseña actualizada
+ *       400:
+ *         description: Datos inválidos (INVALID_CHANGE_PASSWORD_PAYLOAD) o nueva igual a la actual (PASSWORD_UNCHANGED)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       401:
+ *         description: Sin sesión o el usuario ya no existe (UNAUTHORIZED)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       403:
+ *         description: Contraseña actual incorrecta (INVALID_PASSWORD)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       409:
+ *         description: La cuenta no tiene contraseña, p. ej. creada con Google (PASSWORD_NOT_SET)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       429:
+ *         description: Demasiados intentos desde la misma IP (TOO_MANY_REQUESTS); máximo 5 por minuto
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ */
+// Límite por IP: la contraseña actual se verifica aquí, así que no debe servir para probarlas en masa.
+usersRouter.patch("/me/password", rateLimit({ windowMs: 60_000, max: 5 }), validateChangePassword, changeMyPassword);
 
 /**
  * @openapi
