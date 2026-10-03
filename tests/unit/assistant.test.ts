@@ -5,7 +5,12 @@ import type { NextFunction, Request, Response } from "express";
 import { env } from "../../src/config/env";
 import { createChatCompletion, getModelStatuses, resetModelCooldowns } from "../../src/integrations/openrouter.client";
 import { authRepository, type AuthUserRecord } from "../../src/modules/auth/auth.repository";
-import { buildSystemPrompt, type AssistantContext } from "../../src/modules/assistant/assistant.prompt";
+import { app } from "../../src/app";
+import {
+  buildGuestSystemPrompt,
+  buildSystemPrompt,
+  type AssistantContext,
+} from "../../src/modules/assistant/assistant.prompt";
 import { validateChat } from "../../src/modules/assistant/assistant.middlewares";
 import { assistantService } from "../../src/modules/assistant/assistant.service";
 import { transactionsRepository, type TransactionRecord } from "../../src/modules/transactions/transactions.repository";
@@ -14,6 +19,8 @@ import { walletsService, type MyWallet } from "../../src/modules/wallets/wallets
 import { AppError } from "../../src/utils/app-error";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
+/** fetch real, guardado antes de que los tests lo simulen (para llamar al servidor de prueba). */
+const realFetch = globalThis.fetch;
 
 const context: AssistantContext = {
   now: "sábado, 3 de octubre de 2026, 10:00",
@@ -237,5 +244,68 @@ describe("assistantService.chat", () => {
     assert.equal(sent.at(-1)!.content, "¿Cuánto tengo?");
     // Solo un mensaje de sistema: el del servidor.
     assert.equal(sent.filter((m) => m.role === "system").length, 1);
+  });
+
+  it("en el primer mensaje pide saludar por el primer nombre; después, no repetir el saludo", async () => {
+    const calls = mockOpenRouter(200, "ok");
+    resetModelCooldowns();
+    await assistantService.chat(USER_ID, "hola", []);
+    assert.match(calls[0]!.body.messages[0]!.content, /empieza tu respuesta con "¡Hola, Ana!"/);
+    await assistantService.chat(USER_ID, "otra", [
+      { role: "user", content: "hola" },
+      { role: "assistant", content: "¡Hola, Ana!" },
+    ]);
+    assert.match(calls[1]!.body.messages[0]!.content, /no vuelvas a saludar/);
+  });
+});
+
+describe("Nexa en la landing (sin sesión)", () => {
+  const originalKey = env.OPENROUTER_API_KEY;
+  beforeEach(() => {
+    env.OPENROUTER_API_KEY = "test-key";
+    resetModelCooldowns();
+  });
+  afterEach(() => {
+    env.OPENROUTER_API_KEY = originalKey;
+    mock.restoreAll();
+  });
+
+  it("el prompt de invitado no trae datos de usuario y explica cómo crear cuenta e iniciar sesión", () => {
+    const { userName: _u, balances: _b, totalUsd: _t, movements: _m, ...publicContext } = context;
+    const prompt = buildGuestSystemPrompt(publicContext);
+    assert.match(prompt, /VISITANTE sin sesión/);
+    assert.match(prompt, /Crear cuenta: botón "Crear cuenta"/);
+    assert.match(prompt, /1 COP = 0,00025 USD/);
+    assert.doesNotMatch(prompt, /Saldos del usuario|Ana Pérez|Últimos movimientos/);
+  });
+
+  it("chatAsGuest nunca consulta datos de usuarios", async () => {
+    const forbidden = () => {
+      throw new Error("el chat público no debe leer datos de usuarios");
+    };
+    mock.method(authRepository, "findActiveById", forbidden);
+    mock.method(walletsService, "getMyWallet", forbidden);
+    mock.method(transactionsRepository, "findRecentByWallet", forbidden);
+    const calls = mockOpenRouter(200, "Crea tu cuenta desde el botón");
+    const result = await assistantService.chatAsGuest("¿Cómo creo una cuenta?", []);
+    assert.match(result.reply, /Crea tu cuenta/);
+    assert.match(calls[0]!.body.messages[0]!.content, /VISITANTE sin sesión/);
+  });
+
+  it("HTTP: el chat público y los modelos responden sin sesión; el chat privado sigue exigiendo sesión", async () => {
+    mockOpenRouter(200, "Hola visitante");
+    const server = app.listen(0);
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/api/assistant`;
+    try {
+      const post = (path: string) =>
+        realFetch(base + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: "hola" }) });
+      const publicChat = await post("/public/chat");
+      assert.equal(publicChat.status, 200);
+      assert.match(((await publicChat.json()) as { data: { reply: string } }).data.reply, /Hola visitante/);
+      assert.equal((await realFetch(`${base}/models`)).status, 200);
+      assert.equal((await post("/chat")).status, 401);
+    } finally {
+      server.close();
+    }
   });
 });

@@ -1,9 +1,60 @@
 import { Router } from "express";
 import { rateLimit } from "../../middlewares/rate-limit.middleware";
-import { chat, models } from "./assistant.controller";
+import { chat, guestChat, models } from "./assistant.controller";
 import { validateChat } from "./assistant.middlewares";
 
+/** Con sesión: chat con los datos del usuario. app.ts lo monta detrás de requireAuth. */
 export const assistantRouter = Router();
+
+/** Sin sesión: chat de la landing (solo información pública) y estado de los modelos. */
+export const assistantPublicRouter = Router();
+
+/**
+ * @openapi
+ * /api/assistant/public/chat:
+ *   post:
+ *     summary: Conversar con Nexa sin iniciar sesión (landing)
+ *     description: |
+ *       Responde dudas básicas: qué es NexPay, las tasas del día, cálculos rápidos, cómo crear una cuenta,
+ *       iniciar sesión o recuperar la contraseña. No ve datos de ningún usuario: si preguntan por su cuenta,
+ *       invita a iniciar sesión. Máximo 8 mensajes por minuto por IP y 60 por minuto en total.
+ *     tags: [Assistant]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [message]
+ *             properties:
+ *               message: { type: string, maxLength: 500, example: "¿Cómo creo una cuenta?" }
+ *               model: { type: string, description: "Modelo elegido (opcional)" }
+ *               history:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     role: { type: string, enum: [user, assistant] }
+ *                     content: { type: string }
+ *     responses:
+ *       200:
+ *         description: Respuesta de Nexa (mismo formato que /api/assistant/chat)
+ *       400:
+ *         description: Mensaje inválido (INVALID_ASSISTANT_PAYLOAD)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       429:
+ *         description: Demasiados mensajes (TOO_MANY_REQUESTS) o modelos sin cupo (ASSISTANT_BUSY)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ */
+assistantPublicRouter.post(
+  "/public/chat",
+  // Cualquiera puede usarlo: límite por persona y uno general, para que nadie agote el cupo gratis de la IA.
+  rateLimit({ windowMs: 60_000, max: 8, key: (req) => `asistente-publico:${req.ip}` }),
+  rateLimit({ windowMs: 60_000, max: 60, key: () => "asistente-publico:total" }),
+  validateChat,
+  guestChat,
+);
 
 /**
  * @openapi
@@ -76,8 +127,9 @@ export const assistantRouter = Router();
  *     description: |
  *       Del más capaz al más básico. `available: false` significa que se quedó sin cupo o falló hace poco;
  *       `resets_at` dice cuándo se vuelve a probar (la hora que informa OpenRouter o una pausa de 5 minutos).
- *       OpenRouter no informa cuántos mensajes le quedan a cada modelo gratis.
+ *       OpenRouter no informa cuántos mensajes le quedan a cada modelo gratis. Es pública (no tiene datos de nadie).
  *     tags: [Assistant]
+ *     security: []
  *     responses:
  *       200:
  *         description: Lista de modelos
@@ -98,7 +150,7 @@ export const assistantRouter = Router();
  *                       available: { type: boolean }
  *                       resets_at: { type: string, format: date-time, nullable: true }
  */
-assistantRouter.get("/models", models);
+assistantPublicRouter.get("/models", models);
 
 assistantRouter.post(
   "/chat",
