@@ -7,6 +7,7 @@ import {
   buildDepositEmail,
   buildExchangeEmail,
   buildPasswordChangedEmail,
+  buildPasswordResetEmail,
   buildWelcomeEmail,
 } from "./notifications.templates";
 import type {
@@ -115,6 +116,27 @@ export const notificationsService = {
       logger.error("Error al procesar el email de cambio de contraseña", {
         error: err instanceof Error ? err.message : String(err),
         email: user.email,
+      });
+    }
+  },
+
+  async sendPasswordResetEmail(data: { user: NotificationRecipient; resetUrl: string }): Promise<void> {
+    try {
+      const email = buildPasswordResetEmail({
+        ...data,
+        user: await userWithSavedTheme(data.user),
+      });
+      await sendAndRecordEmail({
+        user: data.user,
+        email_type: "password_reset",
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      });
+    } catch (err) {
+      logger.error("Error al procesar el email de restablecimiento de contraseña", {
+        error: err instanceof Error ? err.message : String(err),
+        email: data.user.email,
       });
     }
   },

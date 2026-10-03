@@ -204,7 +204,16 @@ export const usersRepository = {
   /** Guarda el nuevo hash de la contraseña. Devuelve false si el usuario ya no existe. */
   async updatePasswordHash(id: string, passwordHash: string): Promise<boolean> {
     const { rowCount } = await pool.query(
-      `UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+      `WITH updated AS (
+         UPDATE users SET password_hash = $2, updated_at = NOW()
+         WHERE id = $1 AND deleted_at IS NULL
+         RETURNING id
+       ), invalidated AS (
+         UPDATE password_reset_tokens
+         SET used_at = NOW()
+         WHERE user_id IN (SELECT id FROM updated) AND used_at IS NULL
+       )
+       SELECT id FROM updated`,
       [id, passwordHash],
     );
     return (rowCount ?? 0) > 0;
