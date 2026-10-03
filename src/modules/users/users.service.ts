@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { DatabaseError } from "pg";
 
 import { AppError } from "../../utils/app-error";
+import { notificationsService } from "../notifications";
 import { BCRYPT_ROUNDS } from "../auth/auth.service";
 import { authRepository } from "../auth/auth.repository";
 import { revokeToken } from "../auth/auth.token-blacklist";
@@ -77,6 +78,11 @@ export const usersService = {
     if (!(await usersRepository.updatePasswordHash(userId, passwordHash))) {
       throw new AppError(401, "UNAUTHORIZED", "El usuario ya no existe");
     }
+    void notificationsService.sendPasswordChangedEmail({
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+    });
   },
 
   listUsers: () => usersRepository.findAll(),

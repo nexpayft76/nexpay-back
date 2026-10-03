@@ -162,6 +162,41 @@ Recuerda que en NexPay todas las operaciones y saldos son 100% ficticios en modo
   };
 }
 
+export function buildPasswordChangedEmail(user: NotificationRecipient): { subject: string; html: string; text: string } {
+  const subject = "Se cambió la contraseña de tu cuenta NexPay";
+  const firstName = user.full_name.split(" ")[0] || user.full_name;
+  const escapedFirstName = firstName.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+  const contentHtml = `
+    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #eee2c0;">
+      Hola, ${escapedFirstName}
+    </h1>
+    <p style="margin: 0 0 18px; font-size: 15px; line-height: 1.6; color: #b3a888;">
+      Te avisamos que la contraseña de tu cuenta NexPay se cambió correctamente.
+    </p>
+    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #b3a888;">
+      Si no realizaste este cambio, protege tu cuenta y comunícate con el equipo de soporte.
+    </p>
+  `;
+
+  return {
+    subject,
+    html: emailLayout(subject, contentHtml, user.theme),
+    text: `Hola, ${firstName}
+
+Te avisamos que la contraseña de tu cuenta NexPay se cambió correctamente.
+
+Si no realizaste este cambio, protege tu cuenta y comunícate con el equipo de soporte.
+
+© ${new Date().getFullYear()} NexPay`,
+  };
+}
+
 /**
  * Limita los decimales a 2 al mostrar cualquier saldo o monto monetario en el correo.
  * Ejemplo: "1500000.4567" -> "1500000.46", "100" -> "100.00"

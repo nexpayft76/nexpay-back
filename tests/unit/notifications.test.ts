@@ -5,6 +5,7 @@ import {
   buildAlertEmail,
   buildDepositEmail,
   buildExchangeEmail,
+  buildPasswordChangedEmail,
   buildWelcomeEmail,
 } from "../../src/modules/notifications/notifications.templates";
 import { notificationsRepository } from "../../src/modules/notifications/notifications.repository";
@@ -38,6 +39,18 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.ok(email.html.includes("background-color: #faf7f0"));
     assert.ok(email.html.includes("color: #17140e"));
     assert.ok(!email.html.includes("background-color: #0a0a0a"));
+  });
+
+  it("buildPasswordChangedEmail informa el cambio sin incluir ninguna contraseña", () => {
+    const email = buildPasswordChangedEmail(dummyUser);
+    const escapedNameEmail = buildPasswordChangedEmail({ ...dummyUser, full_name: "<Carlos>" });
+
+    assert.equal(email.subject, "Se cambió la contraseña de tu cuenta NexPay");
+    assert.ok(email.html.includes("se cambió correctamente"));
+    assert.ok(email.text.includes("se cambió correctamente"));
+    assert.ok(email.html.includes("Si no realizaste este cambio"));
+    assert.ok(email.text.includes("Si no realizaste este cambio"));
+    assert.ok(escapedNameEmail.html.includes("Hola, &lt;Carlos&gt;"));
   });
 
   it("2. buildExchangeEmail genera resumen de transacción (compra/venta) con detalles y aviso ficticio", () => {
@@ -121,6 +134,7 @@ describe("Notifications Module - AWS SES Emails", () => {
 
   it("notificationsService expone los métodos requeridos y no lanza excepciones no controladas", async () => {
     assert.equal(typeof notificationsService.sendWelcomeEmail, "function");
+    assert.equal(typeof notificationsService.sendPasswordChangedEmail, "function");
     assert.equal(typeof notificationsService.sendExchangeEmail, "function");
     assert.equal(typeof notificationsService.sendDepositEmail, "function");
     assert.equal(typeof notificationsService.sendAlertEmail, "function");
@@ -151,6 +165,21 @@ describe("Notifications Module - AWS SES Emails", () => {
         recipient_email: dummyUser.email,
         email_type: "welcome",
         subject: "¡Bienvenido a NexPay! Gracias por registrarte",
+      });
+      assert.deepEqual(updatedResult, {
+        status: "failed",
+        provider_message_id: undefined,
+        error_message: "AWS_SES_NOT_CONFIGURED",
+      });
+
+      await assert.doesNotReject(async () => {
+        await notificationsService.sendPasswordChangedEmail(dummyUser);
+      });
+      assert.deepEqual(insertedInput, {
+        user_id: dummyUser.id,
+        recipient_email: dummyUser.email,
+        email_type: "password_changed",
+        subject: "Se cambió la contraseña de tu cuenta NexPay",
       });
       assert.deepEqual(updatedResult, {
         status: "failed",
