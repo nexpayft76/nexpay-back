@@ -78,6 +78,8 @@ La lista completa, con ejemplos, está en **`/docs`**.
 | GET | `/api/auth/session` | opcional | Sesión actual o `null` (siempre 200) |
 | GET | `/api/auth/me` | ✔ | Usuario autenticado |
 | GET | `/api/auth/email-available?email=` | — | ¿Email libre? (máx. 20/min por IP) |
+| PATCH | `/api/users/me` | ✔ | Editar mi nombre y/o email (solo esos campos; 409 si el email ya existe) |
+| DELETE | `/api/users/me` | ✔ | Cerrar mi cuenta: pide la contraseña (403 si es incorrecta), exige saldos en 0 (409) y cierra la sesión |
 | GET | `/api/rates?base=USD` | — | Tabla de tasas |
 | GET | `/api/rates/convert?from&to&amount&ars_rate` | — | Conversión (cotizador) |
 | GET | `/api/rates/ars` | — | Dólar oficial, MEP y blue |
@@ -172,6 +174,8 @@ API en http://localhost:3000 · Swagger en http://localhost:3000/docs
 | `npm run build` | Compila a `dist/` |
 | `npm start` | Corre la versión compilada |
 | `npm run typecheck` | Revisa tipos sin compilar |
+| `npm test` | Tests unitarios y de integración (sin base de datos: los repositorios se simulan) |
+| `TEST_DATABASE_URL=postgresql://…/nexpay_test npm test` | Además corre los tests contra una PostgreSQL real y descartable (con `db/schema.sql` y las migraciones aplicadas). El nombre de la base debe incluir `test` |
 | `npm run db:sql -- <archivo.sql>` | Ejecuta SQL contra `DATABASE_URL` |
 
 ---
