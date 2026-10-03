@@ -4,8 +4,10 @@ import { AppError } from "../utils/app-error";
 interface RateLimitOptions {
   /** Ventana de tiempo en milisegundos. */
   windowMs: number;
-  /** Máximo de peticiones por IP dentro de la ventana. */
+  /** Máximo de peticiones por IP (o por `key`) dentro de la ventana. */
   max: number;
+  /** Qué se cuenta. Por defecto la IP; en rutas con sesión conviene contar por usuario. */
+  key?: (req: Request) => string;
 }
 
 /**
@@ -14,12 +16,12 @@ interface RateLimitOptions {
  * permite validar un formulario en tiempo real, pero no probar miles de emails en automático.
  * Con varias instancias del servidor, cada una cuenta por separado (suficiente para NexPay hoy).
  */
-export function rateLimit({ windowMs, max }: RateLimitOptions) {
+export function rateLimit({ windowMs, max, key: keyOf }: RateLimitOptions) {
   const hits = new Map<string, { count: number; resetAt: number }>();
 
   return (req: Request, res: Response, next: NextFunction): void => {
     const now = Date.now();
-    const key = req.ip ?? "desconocida";
+    const key = keyOf?.(req) ?? req.ip ?? "desconocida";
     let entry = hits.get(key);
     if (!entry || entry.resetAt <= now) {
       entry = { count: 0, resetAt: now + windowMs };

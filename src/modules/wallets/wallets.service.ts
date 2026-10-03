@@ -11,7 +11,7 @@ import { alertsService } from "../alerts/alerts.service";
 import { walletsRepository } from "./wallets.repository";
 
 /** Máximo por recarga ficticia, en la moneda recargada (evita saldos absurdos en la demo). */
-const DEPOSIT_LIMITS: Record<string, number> = { COP: 50_000_000, ARS: 20_000_000, USD: 10_000, EUR: 10_000 };
+export const DEPOSIT_LIMITS: Record<string, number> = { COP: 50_000_000, ARS: 20_000_000, USD: 10_000, EUR: 10_000 };
 const DEFAULT_DEPOSIT_LIMIT = 10_000;
 
 export interface DepositInput {
