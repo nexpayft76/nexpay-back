@@ -10,7 +10,7 @@ import { authRepository, type AuthUserRecord } from "./auth.repository";
 import { revokeToken } from "./auth.token-blacklist";
 import type { AuthContext, AuthResult, PublicUser } from "./auth.types";
 
-const BCRYPT_ROUNDS = 10;
+export const BCRYPT_ROUNDS = 10;
 // Hash de referencia para comparar cuando el email no existe (o la cuenta no tiene contraseña):
 // así el login tarda lo mismo en todos los casos y no se puede adivinar qué emails están registrados.
 const DUMMY_HASH = bcrypt.hashSync("nexpay-dummy-password", BCRYPT_ROUNDS);

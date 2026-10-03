@@ -18,6 +18,17 @@ export interface UpdateUserInput {
   status?: "active" | "suspended" | "closed";
 }
 
+/** Datos que un usuario ve de su propia cuenta (sin contraseña ni campos internos). */
+export interface MyProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  status: "active" | "suspended" | "closed";
+  created_at: string;
+}
+
+export type CloseAccountResult = "closed" | "has_balance" | "not_found";
+
 export type UserTheme = "light" | "dark";
 
 export interface UserPreferences {
@@ -149,6 +160,54 @@ export const usersRepository = {
     );
 
     return rows[0] ?? null;
+  },
+
+  /** Actualiza solo nombre y/o email de la cuenta del propio usuario (nunca el estado). */
+  async updateProfile(id: string, input: { full_name?: string; email?: string }): Promise<MyProfile | null> {
+    const { rows } = await pool.query<MyProfile>(
+      `UPDATE users
+       SET full_name = COALESCE($2, full_name),
+           email = COALESCE($3, email),
+           updated_at = NOW()
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id, full_name, email, status, created_at`,
+      [id, input.full_name ?? null, input.email ?? null],
+    );
+    return rows[0] ?? null;
+  },
+
+  /**
+   * Cierra la cuenta (borrado lógico) solo si todos sus saldos están en 0. Es una única sentencia,
+   * así que no hay carrera entre "revisar el saldo" y "cerrar": si entra dinero justo antes, no cierra.
+   */
+  async close(id: string): Promise<CloseAccountResult> {
+    const { rowCount } = await pool.query(
+      `UPDATE users
+       SET deleted_at = NOW(), status = 'closed', updated_at = NOW()
+       WHERE id = $1 AND deleted_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM wallets w
+           JOIN balances b ON b.wallet_id = w.id
+           WHERE w.user_id = users.id AND b.amount > 0
+         )`,
+      [id],
+    );
+    if ((rowCount ?? 0) > 0) return "closed";
+
+    const { rowCount: stillActive } = await pool.query(
+      `SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+    return (stillActive ?? 0) > 0 ? "has_balance" : "not_found";
+  },
+
+  /** Guarda el nuevo hash de la contraseña. Devuelve false si el usuario ya no existe. */
+  async updatePasswordHash(id: string, passwordHash: string): Promise<boolean> {
+    const { rowCount } = await pool.query(
+      `UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+      [id, passwordHash],
+    );
+    return (rowCount ?? 0) > 0;
   },
 
   async remove(id: string): Promise<boolean> {

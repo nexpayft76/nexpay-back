@@ -1,6 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
+import { emailSchema, fullNameSchema, newPasswordSchema, validateBody } from "../auth/auth.middlewares";
+
 const userStatusSchema = z.enum(["active", "suspended", "closed"]);
 const themeSchema = z.object({ theme: z.enum(["light", "dark"]) }).strict();
 const preferencesSchema = z
@@ -79,3 +81,40 @@ export function validateUserId(req: Request, res: Response, next: NextFunction):
 
   next();
 }
+
+/**
+ * PATCH /api/users/me: el usuario solo puede cambiar su nombre y su email.
+ * `.strict()` rechaza cualquier otro campo (en especial `status`, que solo toca un administrador).
+ */
+export const updateMeSchema = z
+  .object({ full_name: fullNameSchema.optional(), email: emailSchema.optional() })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "Debe enviar al menos un campo");
+
+/** DELETE /api/users/me: la contraseña confirma que quien pide cerrar la cuenta es su dueño. */
+export const closeAccountSchema = z
+  .object({ password: z.string({ error: "La contraseña es obligatoria" }).min(1, "La contraseña es obligatoria") })
+  .strict();
+
+export const validateUpdateMe = validateBody(updateMeSchema, "INVALID_PROFILE_PAYLOAD", "Datos del perfil inválidos");
+export const validateCloseAccount = validateBody(
+  closeAccountSchema,
+  "INVALID_CLOSE_ACCOUNT_PAYLOAD",
+  "Para cerrar la cuenta hay que enviar la contraseña",
+);
+
+/** PATCH /api/users/me/password: la contraseña actual confirma al dueño; la nueva sigue las reglas del registro. */
+export const changePasswordSchema = z
+  .object({
+    current_password: z
+      .string({ error: "La contraseña actual es obligatoria" })
+      .min(1, "La contraseña actual es obligatoria"),
+    new_password: newPasswordSchema,
+  })
+  .strict();
+
+export const validateChangePassword = validateBody(
+  changePasswordSchema,
+  "INVALID_CHANGE_PASSWORD_PAYLOAD",
+  "Datos para cambiar la contraseña inválidos",
+);
