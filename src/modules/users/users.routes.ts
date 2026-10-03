@@ -1,16 +1,26 @@
 import { Router } from "express";
 
 import {
+  closeMyAccount,
   deleteUser,
   getMyPreferences,
   getMyTheme,
   getUser,
   listUsers,
+  updateMe,
   updateMyPreferences,
   updateMyTheme,
   updateUser,
 } from "./users.controller";
-import { validatePreferences, validateTheme, validateUpdateUser, validateUserId } from "./users.middlewares";
+import {
+  validateCloseAccount,
+  validatePreferences,
+  validateTheme,
+  validateUpdateMe,
+  validateUpdateUser,
+  validateUserId,
+} from "./users.middlewares";
+import { rateLimit } from "../../middlewares/rate-limit.middleware";
 import { requireAdmin, requireAuth } from "../auth/auth.middlewares";
 
 export const usersRouter = Router();
@@ -19,6 +29,89 @@ usersRouter.get("/me/theme", requireAuth, getMyTheme);
 usersRouter.patch("/me/theme", requireAuth, validateTheme, updateMyTheme);
 usersRouter.get("/me/preferences", requireAuth, getMyPreferences);
 usersRouter.patch("/me/preferences", requireAuth, validatePreferences, updateMyPreferences);
+
+/**
+ * @openapi
+ * /api/users/me:
+ *   patch:
+ *     summary: Edita el nombre y/o el email del usuario autenticado
+ *     description: |
+ *       Solo acepta `full_name` y `email` (cualquier otro campo, como `status`, responde 400).
+ *       Hay que enviar al menos uno. El email se guarda en minúsculas.
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               full_name: { type: string, minLength: 2, maxLength: 120, example: "Ana Pérez" }
+ *               email: { type: string, format: email, example: "ana@nexpay.com" }
+ *     responses:
+ *       200:
+ *         description: Datos actualizados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { $ref: "#/components/schemas/PublicUser" }
+ *       400:
+ *         description: Datos inválidos (INVALID_PROFILE_PAYLOAD)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       401:
+ *         description: Sin sesión o el usuario ya no existe (UNAUTHORIZED)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       409:
+ *         description: El email ya lo usa otra cuenta (EMAIL_ALREADY_REGISTERED)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       429:
+ *         description: Demasiados intentos desde la misma IP (TOO_MANY_REQUESTS); máximo 20 por minuto
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ */
+usersRouter.patch("/me", rateLimit({ windowMs: 60_000, max: 20 }), validateUpdateMe, updateMe);
+
+/**
+ * @openapi
+ * /api/users/me:
+ *   delete:
+ *     summary: Cierra la cuenta del usuario autenticado
+ *     description: |
+ *       Borrado lógico: la cuenta queda cerrada y ya no puede iniciar sesión. Pide la contraseña para
+ *       confirmar y exige que todos los saldos estén en 0. Invalida el token actual y borra la cookie.
+ *       La contraseña incorrecta responde **403** (no 401), para que el front no lo confunda con una sesión vencida.
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password]
+ *             properties:
+ *               password: { type: string, example: "Secreta123" }
+ *     responses:
+ *       204:
+ *         description: Cuenta cerrada; el token deja de servir y la cookie se borra
+ *       400:
+ *         description: Falta la contraseña (INVALID_CLOSE_ACCOUNT_PAYLOAD)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       401:
+ *         description: Sin sesión o el usuario ya no existe (UNAUTHORIZED)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       403:
+ *         description: Contraseña incorrecta (INVALID_PASSWORD)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       409:
+ *         description: Todavía hay saldo en la billetera (ACCOUNT_HAS_BALANCE)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       429:
+ *         description: Demasiados intentos desde la misma IP (TOO_MANY_REQUESTS); máximo 5 por minuto
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ */
+// Límite por IP: la contraseña se verifica aquí, así que no debe servir para probarlas en masa con una sesión robada.
+usersRouter.delete("/me", rateLimit({ windowMs: 60_000, max: 5 }), validateCloseAccount, closeMyAccount);
 
 /**
  * @openapi

@@ -11,19 +11,21 @@ import type { AuthContext } from "./auth.types";
 
 // ---------- Validación de entradas ----------
 
-const emailSchema = z
+export const emailSchema = z
   .string({ error: "El email es obligatorio" })
   .trim()
   .toLowerCase()
   .max(255, "El email no puede superar 255 caracteres")
   .pipe(z.email({ error: "El email no es válido" }));
 
+export const fullNameSchema = z
+  .string({ error: "El nombre completo es obligatorio" })
+  .trim()
+  .min(2, "El nombre completo debe tener al menos 2 caracteres")
+  .max(120, "El nombre completo es demasiado largo");
+
 const registerSchema = z.object({
-  full_name: z
-    .string({ error: "El nombre completo es obligatorio" })
-    .trim()
-    .min(2, "El nombre completo debe tener al menos 2 caracteres")
-    .max(120, "El nombre completo es demasiado largo"),
+  full_name: fullNameSchema,
   email: emailSchema,
   password: z
     .string({ error: "La contraseña es obligatoria" })
@@ -39,7 +41,7 @@ const loginSchema = z.object({
 });
 
 /** Valida el body con zod. Si falla, responde 400 con el mismo formato que el resto de módulos. */
-function validateBody(schema: z.ZodType, errorCode: string, message: string) {
+export function validateBody(schema: z.ZodType, errorCode: string, message: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.body);
     if (!result.success) {

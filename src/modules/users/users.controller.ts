@@ -4,6 +4,7 @@ import { DatabaseError } from "pg";
 import { AppError } from "../../utils/app-error";
 import type { UserRecord } from "./users.repository";
 import { usersService } from "./users.service";
+import { clearSessionCookie } from "../auth/auth.cookies";
 import { getAuth } from "../auth/auth.middlewares";
 
 export async function getMyTheme(req: Request, res: Response): Promise<void> {
@@ -52,6 +53,19 @@ export async function updateMyPreferences(req: Request, res: Response): Promise<
       email_notifications: preferences.email_notifications,
     },
   });
+}
+
+/** Edita el nombre y/o el email del usuario que tiene la sesión iniciada. */
+export async function updateMe(req: Request, res: Response): Promise<void> {
+  const profile = await usersService.updateMe(getAuth(req).userId, req.body);
+  res.status(200).json({ data: profile });
+}
+
+/** Cierra la cuenta del usuario con la sesión iniciada (pide su contraseña) y borra la cookie de sesión. */
+export async function closeMyAccount(req: Request, res: Response): Promise<void> {
+  await usersService.closeMyAccount(getAuth(req), req.body.password);
+  clearSessionCookie(res);
+  res.status(204).send();
 }
 
 const PG_UNIQUE_VIOLATION = "23505";
