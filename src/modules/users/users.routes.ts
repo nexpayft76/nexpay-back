@@ -123,8 +123,9 @@ usersRouter.patch("/me/password", rateLimit({ windowMs: 60_000, max: 5 }), valid
  *   delete:
  *     summary: Cierra la cuenta del usuario autenticado
  *     description: |
- *       Borrado lógico: la cuenta queda cerrada y ya no puede iniciar sesión. Pide la contraseña para
- *       confirmar y exige que todos los saldos estén en 0. Invalida el token actual y borra la cookie.
+ *       Borrado lógico: la cuenta queda cerrada y ya no puede iniciar sesión. Las cuentas con contraseña
+ *       deben enviarla para confirmar; las cuentas creadas con Google pueden omitirla. Exige saldos en 0.
+ *       Invalida el token actual y borra la cookie.
  *       La contraseña incorrecta responde **403** (no 401), para que el front no lo confunda con una sesión vencida.
  *     tags: [Users]
  *     requestBody:
@@ -133,14 +134,13 @@ usersRouter.patch("/me/password", rateLimit({ windowMs: 60_000, max: 5 }), valid
  *         application/json:
  *           schema:
  *             type: object
- *             required: [password]
  *             properties:
- *               password: { type: string, example: "Secreta123" }
+ *               password: { type: string, minLength: 1, description: "Obligatoria para cuentas con contraseña; opcional para cuentas creadas con Google", example: "Secreta123" }
  *     responses:
  *       204:
  *         description: Cuenta cerrada; el token deja de servir y la cookie se borra
  *       400:
- *         description: Falta la contraseña (INVALID_CLOSE_ACCOUNT_PAYLOAD)
+ *         description: El cuerpo de la solicitud es inválido (INVALID_CLOSE_ACCOUNT_PAYLOAD)
  *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
  *       401:
  *         description: Sin sesión o el usuario ya no existe (UNAUTHORIZED)

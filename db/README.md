@@ -17,6 +17,7 @@ PostgreSQL en Railway. El esquema vive en este directorio y cambia **solo median
 | `migrations/008_user_theme.sql` | Preferencia de tema claro/oscuro por usuario para personalizar correos | Aplicado |
 | `migrations/009_user_notification_preferences.sql` | Preferencias de alertas y avisos por usuario, persistidas por cuenta | Aplicado |
 | `migrations/010_user_notifications.sql` | Historial de notificaciones in-app por usuario y lectura | Aplicado |
+| `migrations/013_session_version.sql` | Versión persistente para invalidar sesiones JWT tras recuperar la contraseña | Pendiente |
 
 ## Reglas que el código debe respetar
 

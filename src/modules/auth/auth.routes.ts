@@ -209,6 +209,7 @@ authRouter.post(
  * /api/auth/password-reset/confirm:
  *   post:
  *     summary: Cambia la contraseña usando un enlace vigente de un solo uso
+ *     description: Invalida todas las sesiones existentes al actualizar la contraseña.
  *     security: []
  *     tags: [Auth]
  *     requestBody:

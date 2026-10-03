@@ -174,6 +174,9 @@ export const walletsService = {
     const amount = input.amount.toFixed(currency.decimals);
 
     const result = await withTransaction(async (client) => {
+      if (!(await walletsRepository.lockActiveUserForWallet(client, wallet.id))) {
+        throw new AppError(401, "UNAUTHORIZED", "El usuario ya no está activo");
+      }
       const newBalance = await walletsRepository.creditBalance(client, wallet.id, currency.code, amount);
       const tx = await transactionsRepository.insertDeposit(client, {
         wallet_id: wallet.id,

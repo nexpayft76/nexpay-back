@@ -23,6 +23,7 @@ CREATE TABLE users (
     full_name              VARCHAR(120) NOT NULL,
     email                  VARCHAR(255) NOT NULL UNIQUE,
     password_hash          VARCHAR(255) NOT NULL,
+    session_version        INTEGER      NOT NULL DEFAULT 0,
     theme                  VARCHAR(5)   NOT NULL DEFAULT 'dark' CHECK (theme IN ('light', 'dark')),
     in_app_notifications   BOOLEAN      NOT NULL DEFAULT TRUE,
     email_notifications    BOOLEAN      NOT NULL DEFAULT FALSE,

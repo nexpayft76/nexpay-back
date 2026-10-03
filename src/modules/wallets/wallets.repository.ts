@@ -17,6 +17,18 @@ export interface WalletBalanceRecord {
 }
 
 export const walletsRepository = {
+  /** Serializa las modificaciones de saldo con el cierre y rechaza cuentas que ya no están activas. */
+  async lockActiveUserForWallet(db: Queryable, walletId: string): Promise<boolean> {
+    const { rowCount } = await db.query(
+      `SELECT u.id FROM users u
+       JOIN wallets w ON w.user_id = u.id
+       WHERE w.id = $1 AND u.deleted_at IS NULL AND u.status = 'active'
+       FOR NO KEY UPDATE OF u`,
+      [walletId],
+    );
+    return (rowCount ?? 0) > 0;
+  },
+
   /** Saldos de una wallet con el nombre y los decimales de cada moneda (solo monedas activas). */
   async findBalancesWithCurrency(walletId: string): Promise<WalletBalanceRecord[]> {
     const { rows } = await pool.query<WalletBalanceRecord>(

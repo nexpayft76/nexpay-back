@@ -1,5 +1,6 @@
 import "../helpers/test-env";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { once } from "node:events";
 import type http from "node:http";
 import type { AddressInfo } from "node:net";
@@ -7,6 +8,9 @@ import { after, before, describe, it } from "node:test";
 import { app } from "../../src/app";
 import { pool } from "../../src/config/db";
 import { authService } from "../../src/modules/auth/auth.service";
+import { passwordResetRepository } from "../../src/modules/auth/password-reset.repository";
+import { walletsRepository } from "../../src/modules/wallets/wallets.repository";
+import { usersRepository } from "../../src/modules/users/users.repository";
 
 // Prueba de punta a punta contra una base PostgreSQL REAL (sin mocks): registro, edición y cierre de cuenta.
 // Solo corre si se define TEST_DATABASE_URL (una base descartable con el schema y las migraciones aplicadas):
@@ -170,5 +174,64 @@ describe("Usuario /me contra PostgreSQL real", { skip: !enabled && "definir TEST
     const other = await dbUser(ines.id);
     assert.equal(other.status, "active");
     assert.equal(other.deleted_at, null);
+  });
+
+  it("serializa el cierre con una escritura de saldo y vuelve a comprobar el saldo", async () => {
+    const account = await register("lock");
+    const wallet = await walletsRepository.findByUserId(account.id);
+    assert.ok(wallet);
+
+    const writer = await pool.connect();
+    try {
+      await writer.query("BEGIN");
+      assert.equal(await walletsRepository.lockActiveUserForWallet(writer, wallet.id), true);
+      await walletsRepository.creditBalance(writer, wallet.id, "USD", "25.00");
+
+      const close = usersRepository.close(account.id);
+      const outcome = await Promise.race([
+        close.then((result) => ({ finished: true, result })),
+        new Promise<{ finished: false }>((resolve) => setTimeout(() => resolve({ finished: false }), 50)),
+      ]);
+      assert.deepEqual(outcome, { finished: false });
+
+      await writer.query("COMMIT");
+      assert.equal(await close, "has_balance");
+    } catch (err) {
+      await writer.query("ROLLBACK");
+      throw err;
+    } finally {
+      writer.release();
+    }
+  });
+
+  it("serializa solicitudes de recuperación para dejar un solo enlace activo", async () => {
+    const account = await register("reset-serial");
+    const hashes = ["a".repeat(64), "b".repeat(64)];
+    const expiry = new Date(Date.now() + 60 * 60 * 1000);
+
+    await Promise.all(hashes.map((hash) => passwordResetRepository.create(account.id, hash, expiry)));
+
+    const { rows } = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM password_reset_tokens
+       WHERE user_id = $1 AND used_at IS NULL AND expires_at > NOW()`,
+      [account.id],
+    );
+    assert.equal(rows[0]?.count, "1");
+  });
+
+  it("invalida las sesiones existentes después de restablecer la contraseña", async () => {
+    const account = await register("reset-session");
+    const token = "c".repeat(64);
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    await passwordResetRepository.create(account.id, tokenHash, new Date(Date.now() + 60 * 60 * 1000));
+
+    await authService.resetPassword(token, "NuevaClave123");
+
+    assert.equal((await call("GET", "/api/auth/me", account.token)).status, 401);
+    const login = await call("POST", "/api/auth/login", null, {
+      email: account.email,
+      password: "NuevaClave123",
+    });
+    assert.equal(login.status, 200);
   });
 });

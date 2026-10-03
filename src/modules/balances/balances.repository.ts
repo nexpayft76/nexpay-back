@@ -1,4 +1,6 @@
-import { pool } from "../../config/db";
+import { pool, withTransaction } from "../../config/db";
+import { AppError } from "../../utils/app-error";
+import { walletsRepository } from "../wallets/wallets.repository";
 
 export interface BalanceRecord {
   id: string;
@@ -41,13 +43,20 @@ export const balancesRepository = {
   },
 
   async create(input: CreateBalanceInput): Promise<BalanceRecord> {
-    const { rows } = await pool.query<BalanceRecord>(
-      `INSERT INTO balances (wallet_id, currency_code, amount)
-       VALUES ($1, $2, COALESCE($3, '0'))
-       RETURNING *`,
-      [input.wallet_id, input.currency_code, input.amount ?? "0"],
-    );
-    return rows[0];
+    return withTransaction(async (client) => {
+      if (!(await walletsRepository.lockActiveUserForWallet(client, input.wallet_id))) {
+        throw new AppError(401, "UNAUTHORIZED", "El usuario ya no está activo");
+      }
+      const { rows } = await client.query<BalanceRecord>(
+        `INSERT INTO balances (wallet_id, currency_code, amount)
+         VALUES ($1, $2, COALESCE($3, '0'))
+         RETURNING *`,
+        [input.wallet_id, input.currency_code, input.amount ?? "0"],
+      );
+      const balance = rows[0];
+      if (!balance) throw new Error("INSERT INTO balances no devolvió filas");
+      return balance;
+    });
   },
 
   async update(id: string, input: UpdateBalanceInput): Promise<BalanceRecord | null> {
@@ -55,15 +64,25 @@ export const balancesRepository = {
       return this.findById(id);
     }
 
-    const { rows } = await pool.query<BalanceRecord>(
-      `UPDATE balances
-       SET amount = $1, updated_at = NOW()
-       WHERE id = $2
-       RETURNING *`,
-      [input.amount, id],
-    );
+    return withTransaction(async (client) => {
+      const { rows: balanceRows } = await client.query<{ wallet_id: string }>(
+        "SELECT wallet_id FROM balances WHERE id = $1",
+        [id],
+      );
+      const balance = balanceRows[0];
+      if (!balance) return null;
 
-    return rows[0] ?? null;
+      if (!(await walletsRepository.lockActiveUserForWallet(client, balance.wallet_id))) {
+        throw new AppError(401, "UNAUTHORIZED", "El usuario ya no está activo");
+      }
+      const { rows } = await client.query<BalanceRecord>(
+        `UPDATE balances SET amount = $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [input.amount, id],
+      );
+      return rows[0] ?? null;
+    });
   },
 
 };

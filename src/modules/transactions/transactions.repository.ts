@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 
 import { pool, type Queryable } from "../../config/db";
 import { AppError } from "../../utils/app-error";
+import { walletsRepository } from "../wallets/wallets.repository";
 
 export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT";
 
@@ -72,6 +73,10 @@ export const transactionsRepository = {
    * Si algo falla, withTransaction hace ROLLBACK y no queda nada a medias.
    */
   async applyExchange(client: PoolClient, input: ExchangeInput): Promise<ExchangeRecord> {
+    if (!(await walletsRepository.lockActiveUserForWallet(client, input.wallet_id))) {
+      throw new AppError(401, "UNAUTHORIZED", "El usuario ya no está activo");
+    }
+
     // FOR UPDATE: dos operaciones simultáneas sobre la misma wallet esperan su turno (sin saldo negativo).
     // ORDER BY fijo: siempre se bloquean en el mismo orden, así dos cambios cruzados no se trancan.
     await client.query(

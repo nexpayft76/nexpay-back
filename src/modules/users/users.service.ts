@@ -33,12 +33,12 @@ export const usersService = {
    * y revoca el token actual. La contraseña incorrecta responde 403 y NO 401: el front trata cualquier
    * 401 como "sesión vencida" y cerraría la sesión de alguien que solo se equivocó al escribirla.
    */
-  async closeMyAccount(auth: AuthContext, password: string): Promise<void> {
+  async closeMyAccount(auth: AuthContext, password?: string): Promise<void> {
     const user = await authRepository.findActiveById(auth.userId);
     if (!user) throw new AppError(401, "UNAUTHORIZED", "El usuario ya no existe");
 
     // Las cuentas sin contraseña (creadas con Google) no tienen con qué confirmar: se omite el control.
-    if (user.password_hash && !(await bcrypt.compare(password, user.password_hash))) {
+    if (user.password_hash && (!password || !(await bcrypt.compare(password, user.password_hash)))) {
       throw new AppError(403, "INVALID_PASSWORD", "La contraseña es incorrecta");
     }
 
