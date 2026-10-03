@@ -5,4 +5,4 @@ export { currenciesRouter } from "./currencies/currencies.routes";
 export { transactionsRouter } from "./transactions/transactions.routes";
 export { alertsRouter } from "./alerts/alerts.routes";
 export { notificationsRouter } from "./notifications/notifications.routes";
-export { assistantRouter } from "./assistant/assistant.routes";
+export { assistantPublicRouter, assistantRouter } from "./assistant/assistant.routes";

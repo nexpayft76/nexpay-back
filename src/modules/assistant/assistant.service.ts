@@ -8,7 +8,9 @@ import { transactionsRepository } from "../transactions/transactions.repository"
 import { DEPOSIT_LIMITS, walletsService } from "../wallets/wallets.service";
 import { walletsRepository } from "../wallets/wallets.repository";
 import {
+  buildGuestSystemPrompt,
   buildSystemPrompt,
+  type AssistantPublicContext,
   type AssistantArsQuote,
   type AssistantBalance,
   type AssistantContext,
@@ -85,36 +87,52 @@ async function loadUserData(
   }
 }
 
-export async function buildAssistantContext(userId: string): Promise<AssistantContext> {
-  const [user, rates, data] = await Promise.all([
-    authRepository.findActiveById(userId),
-    loadRates(),
-    loadUserData(userId),
-  ]);
+/** Lo público: tasas, comisión y límites (sirve también para los visitantes de la landing). */
+export async function buildPublicContext(): Promise<AssistantPublicContext> {
   return {
     now: new Date().toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "full", timeStyle: "short" }),
-    userName: user?.full_name ?? "usuario",
     feePercent: env.EXCHANGE_FEE_PERCENT,
     depositLimits: DEPOSIT_LIMITS,
-    ...rates,
-    ...data,
+    ...(await loadRates()),
   };
+}
+
+export async function buildAssistantContext(userId: string): Promise<AssistantContext> {
+  const [user, publicContext, data] = await Promise.all([
+    authRepository.findActiveById(userId),
+    buildPublicContext(),
+    loadUserData(userId),
+  ]);
+  return { ...publicContext, userName: user?.full_name ?? "", ...data };
+}
+
+/** Arma los mensajes para la IA: prompt del servidor + turnos anteriores + mensaje nuevo. */
+function toMessages(systemPrompt: string, history: AssistantTurn[], message: string): ChatMessage[] {
+  return [
+    { role: "system", content: systemPrompt },
+    ...history.map((turn) => ({ role: turn.role, content: turn.content })),
+    { role: "user", content: message },
+  ];
 }
 
 export const assistantService = {
   /**
-   * Responde un mensaje del usuario. El asistente solo enseña, explica, sugiere y calcula:
-   * no tiene ninguna herramienta para mover dinero ni cambiar datos (las operaciones las hace el usuario).
+   * Responde un mensaje del usuario con sesión: lo llama por su nombre y usa sus datos (solo lectura).
+   * El asistente solo enseña, explica, sugiere y calcula: no tiene ninguna herramienta para mover dinero.
    */
   async chat(userId: string, message: string, history: AssistantTurn[], preferredModel?: string): Promise<AssistantReply> {
     const context = await buildAssistantContext(userId);
-    const messages: ChatMessage[] = [
-      { role: "system", content: buildSystemPrompt(context) },
-      ...history.map((turn) => ({ role: turn.role, content: turn.content })),
-      { role: "user", content: message },
-    ];
-    const { reply, model } = await createChatCompletion(messages, { preferredModel });
+    const prompt = buildSystemPrompt(context, { firstMessage: history.length === 0 });
+    const { reply, model } = await createChatCompletion(toMessages(prompt, history, message), { preferredModel });
     logger.info("asistente: respuesta enviada", { user_id: userId, history: history.length, model });
+    return { reply, model, model_label: modelLabel(model) };
+  },
+
+  /** Visitante sin sesión (landing): solo información pública; nunca ve datos de ningún usuario. */
+  async chatAsGuest(message: string, history: AssistantTurn[], preferredModel?: string): Promise<AssistantReply> {
+    const prompt = buildGuestSystemPrompt(await buildPublicContext());
+    const { reply, model } = await createChatCompletion(toMessages(prompt, history, message), { preferredModel });
+    logger.info("asistente: respuesta a visitante", { history: history.length, model });
     return { reply, model, model_label: modelLabel(model) };
   },
 

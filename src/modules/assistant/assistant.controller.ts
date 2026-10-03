@@ -10,6 +10,13 @@ export async function chat(req: Request, res: Response): Promise<void> {
   res.status(200).json({ data: result });
 }
 
+/** Visitante sin sesión (landing): solo información pública. */
+export async function guestChat(req: Request, res: Response): Promise<void> {
+  const { message, history, model } = req.body as ChatBody;
+  const result = await assistantService.chatAsGuest(message, history, model);
+  res.status(200).json({ data: result });
+}
+
 /** Modelos del asistente, del más capaz al más básico, con su estado (disponible o sin cupo). */
 export function models(_req: Request, res: Response): void {
   res.status(200).json({ data: assistantService.models() });

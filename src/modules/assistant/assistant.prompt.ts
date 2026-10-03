@@ -35,17 +35,22 @@ export interface AssistantMovement {
   toAmount: number;
 }
 
-export interface AssistantContext {
+/** Lo que se le cuenta a cualquiera (también en la landing, sin sesión): tasas y reglas generales. */
+export interface AssistantPublicContext {
   now: string;
-  userName: string;
   ratesDate: string | null;
   rates: AssistantRate[];
   arsQuotes: AssistantArsQuote[];
+  feePercent: number;
+  depositLimits: Record<string, number>;
+}
+
+/** Con sesión: además, el nombre, los saldos y los movimientos del usuario (solo lectura). */
+export interface AssistantContext extends AssistantPublicContext {
+  userName: string;
   balances: AssistantBalance[];
   totalUsd: number | null;
   movements: AssistantMovement[];
-  feePercent: number;
-  depositLimits: Record<string, number>;
 }
 
 /** Lo que el asistente sabe de NexPay. Si se agregan funciones nuevas, actualizar acá. */
@@ -53,7 +58,15 @@ const NEXPAY_KNOWLEDGE = `
 NexPay es una billetera digital multimoneda (peso colombiano COP, peso argentino ARS, dólar USD y euro EUR),
 con foco en el corredor Colombia ↔ Argentina. Es un proyecto demo: el dinero es ficticio.
 
-Pantallas y funciones (menú lateral):
+Cuenta (desde la página de inicio, sin sesión):
+- Crear cuenta: botón "Crear cuenta" arriba a la derecha. Se pide nombre completo, email y contraseña (entre 8 y 72
+  caracteres, con al menos una letra y un número) y repetir la contraseña. El formulario avisa en tiempo real si el
+  email ya está registrado o si la contraseña no cumple. Al crearla, se entra directo al dashboard.
+- Iniciar sesión: botón "Iniciar sesión" con email y contraseña (el ojito muestra la contraseña).
+- ¿Olvidaste tu contraseña?: en el login, se pide un enlace por email para crear una nueva.
+- Crear la cuenta es gratis y el dinero es ficticio (demo).
+
+Pantallas y funciones con sesión (menú lateral):
 - Mi wallet (dashboard): total estimado de todos los saldos en la moneda que el usuario elija, gráfico del par de
   monedas (1 semana a 1 año), saldos por moneda y un cotizador.
 - Cotizador: calcula cuánto se recibe al cambiar un monto, sin mover saldos. Si participa ARS compara el dólar
@@ -109,10 +122,10 @@ function formatNumber(value: number, maxDecimals = 6): string {
   return new Intl.NumberFormat("es-AR", { maximumFractionDigits: maxDecimals }).format(value);
 }
 
-function contextBlock(ctx: AssistantContext): string {
+/** Tasas, comisión y límites: lo mismo para invitados y usuarios. */
+function publicContextBlock(ctx: AssistantPublicContext): string {
   const lines: string[] = [];
   lines.push(`Fecha y hora actual: ${ctx.now}.`);
-  lines.push(`Usuario: ${ctx.userName}.`);
 
   lines.push("", `Tasas actuales${ctx.ratesDate ? ` (tasa oficial del día ${ctx.ratesDate}; ARS al dólar MEP en vivo)` : ""}:`);
   if (ctx.rates.length === 0) lines.push("- No hay tasas disponibles en este momento.");
@@ -129,7 +142,13 @@ function contextBlock(ctx: AssistantContext): string {
       .map(([code, limit]) => `${formatNumber(limit, 0)} ${code}`)
       .join(", ")}.`,
   );
+  return lines.join("\n");
+}
 
+/** Datos privados del usuario con sesión. */
+function userContextBlock(ctx: AssistantContext): string {
+  const lines: string[] = [];
+  lines.push(`Usuario: ${ctx.userName}.`);
   lines.push("", "Saldos del usuario:");
   if (ctx.balances.length === 0) lines.push("- No se pudieron cargar los saldos.");
   for (const b of ctx.balances) {
@@ -150,16 +169,60 @@ function contextBlock(ctx: AssistantContext): string {
   return lines.join("\n");
 }
 
-export function buildSystemPrompt(ctx: AssistantContext): string {
+/** Primer nombre para saludar ("Alejo" de "Alejo Carmona"). */
+export function firstName(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] ?? "";
+}
+
+/** Con sesión: conoce al usuario, lo llama por su nombre y usa sus datos. */
+export function buildSystemPrompt(ctx: AssistantContext, options: { firstMessage?: boolean } = {}): string {
+  const name = firstName(ctx.userName);
+  const personal = name
+    ? [
+        `Personalización: el usuario se llama ${name}. Háblale por su nombre de forma natural.`,
+        options.firstMessage
+          ? `Este es su primer mensaje de la conversación: empieza tu respuesta con "¡Hola, ${name}!" y responde enseguida.`
+          : "Ya están conversando: no vuelvas a saludar; usa su nombre solo de vez en cuando.",
+      ].join("\n")
+    : "";
   return [
     `Eres ${ASSISTANT_NAME}, la asistente virtual de NexPay. Enseñas, explicas, sugieres y respondes dudas sobre NexPay.`,
     "",
     RULES,
+    personal && `\n${personal}`,
     "",
     "Lo que sabes de NexPay:",
     NEXPAY_KNOWLEDGE,
     "",
     "Contexto actual (datos reales del sistema, úsalos para responder):",
-    contextBlock(ctx),
+    publicContextBlock(ctx),
+    "",
+    userContextBlock(ctx),
+  ].join("\n");
+}
+
+const GUEST_RULES = `
+Estás en la página pública de NexPay: quien te escribe es un VISITANTE sin sesión.
+- No tienes acceso a ninguna cuenta: no conoces su nombre, saldos ni movimientos. Nunca los inventes.
+- Si pregunta algo de su cuenta (saldo, movimientos, recargar, comprar), explícale brevemente que para eso tiene que
+  iniciar sesión, o crear una cuenta gratis si todavía no tiene.
+- Ayúdalo con lo básico: qué es NexPay, las tasas del día, cálculos rápidos, cómo crear una cuenta, iniciar sesión
+  o recuperar la contraseña.
+`.trim();
+
+/** Sin sesión (landing): solo información pública, sin datos de ningún usuario. */
+export function buildGuestSystemPrompt(ctx: AssistantPublicContext): string {
+  return [
+    `Eres ${ASSISTANT_NAME}, la asistente virtual de NexPay. Respondes dudas básicas sobre NexPay.`,
+    "",
+    RULES,
+    "",
+    GUEST_RULES,
+    "",
+    "Lo que sabes de NexPay:",
+    NEXPAY_KNOWLEDGE,
+    "",
+    "Contexto actual (datos reales del sistema, úsalos para responder):",
+    publicContextBlock(ctx),
   ].join("\n");
 }
