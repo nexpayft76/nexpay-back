@@ -117,7 +117,7 @@ function readToken(req: Request): { token: string; fromCookie: boolean } | null 
   return cookie ? { token: cookie, fromCookie: true } : null;
 }
 
-/** Verifica firma, vencimiento, que no esté revocado y que el usuario siga activo. Si no, 401. */
+/** Verifica firma, vencimiento, revocación, versión de sesión y estado activo. Si falla, responde 401. */
 export async function authenticate(token: string): Promise<{ auth: AuthContext; user: AuthUserRecord }> {
   let payload: jwt.JwtPayload;
   try {
@@ -129,11 +129,14 @@ export async function authenticate(token: string): Promise<{ auth: AuthContext; 
   }
 
   const { sub, jti, exp } = payload;
-  if (!sub || !jti || !exp) throw unauthorized("Sesión inválida");
+  const sessionVersion = payload.sv ?? 0;
+  if (!sub || !jti || !exp || !Number.isInteger(sessionVersion)) throw unauthorized("Sesión inválida");
   if (isTokenRevoked(jti)) throw unauthorized("La sesión fue cerrada");
 
   const user = await authRepository.findActiveById(sub);
-  if (!user || user.status !== "active") throw unauthorized("El usuario no existe o no está activo");
+  if (!user || user.status !== "active" || user.session_version !== sessionVersion) {
+    throw unauthorized("El usuario no existe o la sesión ya no es válida");
+  }
 
   return { auth: { userId: sub, jti, exp }, user };
 }

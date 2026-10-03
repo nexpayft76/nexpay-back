@@ -14,6 +14,7 @@ const user: AuthUserRecord = {
   full_name: "Ana Pérez",
   email: "ana@nexpay.com",
   password_hash: "existing-hash",
+  session_version: 0,
   status: "active",
   created_at: new Date("2026-03-05T10:00:00.000Z"),
   deleted_at: null,
@@ -24,7 +25,7 @@ describe("authService password reset", () => {
 
   it("does not reveal or create reset tokens for unknown emails", async () => {
     mock.method(authRepository, "findByEmail", async () => null);
-    const createToken = mock.method(passwordResetRepository, "create", async () => {});
+    const createToken = mock.method(passwordResetRepository, "create", async () => true);
     const sendEmail = mock.method(notificationsService, "sendPasswordResetEmail", async () => {});
 
     await authService.requestPasswordReset("unknown@example.com");
@@ -35,7 +36,7 @@ describe("authService password reset", () => {
 
   it("creates a hashed one-hour token and sends its link for an active password account", async () => {
     mock.method(authRepository, "findByEmail", async () => user);
-    const createToken = mock.method(passwordResetRepository, "create", async () => {});
+    const createToken = mock.method(passwordResetRepository, "create", async () => true);
     const sendEmail = mock.method(notificationsService, "sendPasswordResetEmail", async () => {});
     const before = Date.now();
 

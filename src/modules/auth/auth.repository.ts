@@ -7,12 +7,13 @@ export interface AuthUserRecord {
   email: string;
   /** null en cuentas creadas con Google (sin contraseña). */
   password_hash: string | null;
+  session_version: number;
   status: UserStatus;
   created_at: Date;
   deleted_at: Date | null;
 }
 
-const COLUMNS = "id, full_name, email, password_hash, status, created_at, deleted_at";
+const COLUMNS = "id, full_name, email, password_hash, session_version, status, created_at, deleted_at";
 
 export const authRepository = {
   async findByEmail(email: string, db: Queryable = pool): Promise<AuthUserRecord | null> {

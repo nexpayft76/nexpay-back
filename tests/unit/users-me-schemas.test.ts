@@ -45,9 +45,9 @@ describe("PATCH /users/me: esquema", () => {
 });
 
 describe("DELETE /users/me: esquema", () => {
-  it("exige la contraseña", () => {
+  it("acepta una contraseña opcional para cuentas creadas con Google", () => {
     assert.equal(closeAccountSchema.safeParse({ password: "Secreta123" }).success, true);
-    assert.equal(closeAccountSchema.safeParse({}).success, false);
+    assert.equal(closeAccountSchema.safeParse({}).success, true);
     assert.equal(closeAccountSchema.safeParse({ password: "" }).success, false);
     assert.equal(closeAccountSchema.safeParse({ password: 123 }).success, false);
   });

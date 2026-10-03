@@ -27,6 +27,7 @@ function authUser(overrides: Partial<AuthUserRecord> = {}): AuthUserRecord {
     full_name: profile.full_name,
     email: profile.email,
     password_hash: PASSWORD_HASH,
+    session_version: 0,
     status: "active",
     created_at: new Date(profile.created_at),
     deleted_at: null,
@@ -149,7 +150,7 @@ describe("usersService.closeMyAccount", () => {
     const close = mock.method(usersRepository, "close", async () => "closed" as const);
     const auth = newAuth();
 
-    await usersService.closeMyAccount(auth, "lo-que-sea");
+    await usersService.closeMyAccount(auth);
 
     assert.equal(close.mock.callCount(), 1);
     assert.equal(isTokenRevoked(auth.jti), true);

@@ -33,6 +33,7 @@ const dbUser: AuthUserRecord = {
   full_name: profile.full_name,
   email: profile.email,
   password_hash: PASSWORD_HASH,
+  session_version: 0,
   status: "active",
   created_at: new Date(profile.created_at),
   deleted_at: null,
@@ -42,9 +43,9 @@ let server: http.Server;
 let baseUrl: string;
 let jtiCounter = 0;
 
-function tokenFor(userId = USER_ID): string {
+function tokenFor(userId = USER_ID, sessionVersion = 0): string {
   jtiCounter += 1;
-  return jwt.sign({}, env.JWT_SECRET, {
+  return jwt.sign({ sv: sessionVersion }, env.JWT_SECRET, {
     subject: userId,
     jwtid: `jti-http-${jtiCounter}`,
     expiresIn: 3600,
@@ -203,17 +204,25 @@ describe("PATCH /api/users/me", () => {
   });
 });
 
+describe("sesiones versionadas", () => {
+  it("rechaza tokens emitidos antes de un cambio de versión de sesión", async () => {
+    const res = await call("GET", "/api/auth/me", { token: tokenFor(USER_ID, 1) });
+    assert.equal(res.status, 401);
+    assert.match(res.body.message, /sesión ya no es válida/);
+  });
+});
+
 describe("DELETE /api/users/me", () => {
   it("sin sesión responde 401", async () => {
     const res = await call("DELETE", "/api/users/me", { token: null, body: { password: PASSWORD } });
     assert.equal(res.status, 401);
   });
 
-  it("sin contraseña responde 400 y no toca la cuenta", async () => {
+  it("sin contraseña rechaza el cierre de una cuenta con contraseña", async () => {
     const close = mock.method(usersRepository, "close", async () => "closed" as const);
     const res = await call("DELETE", "/api/users/me", { body: {} });
-    assert.equal(res.status, 400);
-    assert.equal(res.body.error, "INVALID_CLOSE_ACCOUNT_PAYLOAD");
+    assert.equal(res.status, 403);
+    assert.equal(res.body.error, "INVALID_PASSWORD");
     assert.equal(close.mock.callCount(), 0);
   });
 
@@ -261,8 +270,11 @@ describe("DELETE /api/users/me", () => {
   });
 
   it("no choca con DELETE /api/users/:id (solo administradores)", async () => {
+    mock.method(authRepository, "findActiveById", async (id: string) =>
+      id === USER_ID ? { ...dbUser, password_hash: null } : null,
+    );
     mock.method(usersRepository, "close", async () => "closed" as const);
-    const res = await call("DELETE", "/api/users/me", { body: { password: PASSWORD } });
+    const res = await call("DELETE", "/api/users/me", { body: {} });
     assert.equal(res.status, 204);
 
     const asNormalUser = await call("DELETE", `/api/users/${USER_ID}`);

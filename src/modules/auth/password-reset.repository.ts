@@ -1,4 +1,4 @@
-import { pool } from "../../config/db";
+import { pool, withTransaction } from "../../config/db";
 
 export interface PasswordResetUser {
   id: string;
@@ -7,17 +7,28 @@ export interface PasswordResetUser {
 }
 
 export const passwordResetRepository = {
-  async create(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-    await pool.query(
-      `WITH invalidated AS (
-         UPDATE password_reset_tokens
-         SET used_at = NOW()
-         WHERE user_id = $1 AND used_at IS NULL
-       )
-       INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
-       VALUES ($1, $2, $3)`,
-      [userId, tokenHash, expiresAt],
-    );
+  async create(userId: string, tokenHash: string, expiresAt: Date): Promise<boolean> {
+    return withTransaction(async (client) => {
+      const { rowCount } = await client.query(
+        `SELECT id FROM users
+         WHERE id = $1 AND deleted_at IS NULL AND status = 'active' AND password_hash IS NOT NULL
+         FOR NO KEY UPDATE`,
+        [userId],
+      );
+      if ((rowCount ?? 0) === 0) return false;
+
+      await client.query(
+        `UPDATE password_reset_tokens SET used_at = NOW()
+         WHERE user_id = $1 AND used_at IS NULL`,
+        [userId],
+      );
+      await client.query(
+        `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+         VALUES ($1, $2, $3)`,
+        [userId, tokenHash, expiresAt],
+      );
+      return true;
+    });
   },
 
   async isValid(tokenHash: string): Promise<boolean> {
@@ -40,6 +51,19 @@ export const passwordResetRepository = {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      const lockedUser = await client.query(
+        `SELECT u.id
+         FROM users u
+         JOIN password_reset_tokens t ON t.user_id = u.id
+         WHERE t.token_hash = $1
+         FOR NO KEY UPDATE OF u`,
+        [tokenHash],
+      );
+      if ((lockedUser.rowCount ?? 0) === 0) {
+        await client.query("COMMIT");
+        return null;
+      }
+
       const { rows } = await client.query<PasswordResetUser & { token_id: string }>(
         `SELECT t.id AS token_id, u.id, u.email, u.full_name
          FROM password_reset_tokens t
@@ -60,7 +84,7 @@ export const passwordResetRepository = {
       }
 
       const { rowCount } = await client.query(
-        `UPDATE users SET password_hash = $2, updated_at = NOW()
+        `UPDATE users SET password_hash = $2, session_version = session_version + 1, updated_at = NOW()
          WHERE id = $1 AND deleted_at IS NULL AND status = 'active'`,
         [reset.id, passwordHash],
       );

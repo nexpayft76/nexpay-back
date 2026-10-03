@@ -39,7 +39,7 @@ export function toPublicUser(user: AuthUserRecord): PublicUser {
 }
 
 function issueToken(user: AuthUserRecord): AuthResult {
-  const token = jwt.sign({}, env.JWT_SECRET, {
+  const token = jwt.sign({ sv: user.session_version }, env.JWT_SECRET, {
     subject: user.id,
     jwtid: randomUUID(),
     expiresIn: env.jwtExpiresInSeconds,
@@ -109,7 +109,8 @@ export const authService = {
     const user = await authRepository.findByEmail(email);
     if (!user || user.deleted_at !== null || user.status !== "active" || !user.password_hash) return;
 
-    await passwordResetRepository.create(user.id, tokenHash, new Date(Date.now() + 60 * 60 * 1000));
+    const created = await passwordResetRepository.create(user.id, tokenHash, new Date(Date.now() + 60 * 60 * 1000));
+    if (!created) return;
     const resetUrl = new URL("/reset-password", env.frontendAppUrl);
     resetUrl.hash = new URLSearchParams({ token }).toString();
     void notificationsService.sendPasswordResetEmail({
