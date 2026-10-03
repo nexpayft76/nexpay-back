@@ -284,3 +284,50 @@ describe("DELETE /api/users/me", () => {
     assert.ok(limited.headers.get("retry-after"));
   });
 });
+
+describe("PATCH /api/users/me/password", () => {
+  const body = { current_password: PASSWORD, new_password: "NuevaSecreta456" };
+
+  it("sin sesión responde 401", async () => {
+    const res = await call("PATCH", "/api/users/me/password", { token: null, body });
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error, "UNAUTHORIZED");
+  });
+
+  it("cambia la contraseña y responde 204", async () => {
+    const save = mock.method(usersRepository, "updatePasswordHash", async () => true);
+
+    const res = await call("PATCH", "/api/users/me/password", { body });
+
+    assert.equal(res.status, 204);
+    assert.equal(save.mock.callCount(), 1);
+    assert.equal(save.mock.calls[0].arguments[0], USER_ID);
+  });
+
+  it("con la contraseña actual incorrecta responde 403 (no 401) y no guarda", async () => {
+    const save = mock.method(usersRepository, "updatePasswordHash", async () => true);
+
+    const res = await call("PATCH", "/api/users/me/password", { body: { ...body, current_password: "Incorrecta1" } });
+
+    assert.equal(res.status, 403);
+    assert.equal(res.body.error, "INVALID_PASSWORD");
+    assert.equal(save.mock.callCount(), 0);
+  });
+
+  it("con una nueva contraseña débil responde 400 INVALID_CHANGE_PASSWORD_PAYLOAD", async () => {
+    const res = await call("PATCH", "/api/users/me/password", { body: { ...body, new_password: "corta" } });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, "INVALID_CHANGE_PASSWORD_PAYLOAD");
+  });
+
+  it("limita los intentos por IP (429)", async () => {
+    mock.method(usersRepository, "updatePasswordHash", async () => true);
+    let limited: Reply | undefined;
+    for (let i = 0; i < 10 && !limited; i++) {
+      const res = await call("PATCH", "/api/users/me/password", { body });
+      if (res.status === 429) limited = res;
+    }
+    assert.ok(limited, "debería haber respondido 429 antes de 10 intentos");
+    assert.equal(limited.body.error, "TOO_MANY_REQUESTS");
+  });
+});

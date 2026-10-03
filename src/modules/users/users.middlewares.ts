@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
-import { emailSchema, fullNameSchema, validateBody } from "../auth/auth.middlewares";
+import { emailSchema, fullNameSchema, newPasswordSchema, validateBody } from "../auth/auth.middlewares";
 
 const userStatusSchema = z.enum(["active", "suspended", "closed"]);
 const themeSchema = z.object({ theme: z.enum(["light", "dark"]) }).strict();
@@ -101,4 +101,20 @@ export const validateCloseAccount = validateBody(
   closeAccountSchema,
   "INVALID_CLOSE_ACCOUNT_PAYLOAD",
   "Para cerrar la cuenta hay que enviar la contraseña",
+);
+
+/** PATCH /api/users/me/password: la contraseña actual confirma al dueño; la nueva sigue las reglas del registro. */
+export const changePasswordSchema = z
+  .object({
+    current_password: z
+      .string({ error: "La contraseña actual es obligatoria" })
+      .min(1, "La contraseña actual es obligatoria"),
+    new_password: newPasswordSchema,
+  })
+  .strict();
+
+export const validateChangePassword = validateBody(
+  changePasswordSchema,
+  "INVALID_CHANGE_PASSWORD_PAYLOAD",
+  "Datos para cambiar la contraseña inválidos",
 );

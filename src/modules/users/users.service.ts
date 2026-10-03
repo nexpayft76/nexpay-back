@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { DatabaseError } from "pg";
 
 import { AppError } from "../../utils/app-error";
+import { BCRYPT_ROUNDS } from "../auth/auth.service";
 import { authRepository } from "../auth/auth.repository";
 import { revokeToken } from "../auth/auth.token-blacklist";
 import type { AuthContext } from "../auth/auth.types";
@@ -51,6 +52,31 @@ export const usersService = {
     if (result === "not_found") throw new AppError(401, "UNAUTHORIZED", "El usuario ya no existe");
 
     revokeToken(auth.jti, auth.exp);
+  },
+
+  /**
+   * Cambia la contraseña del propio usuario. Pide la actual (403 si no coincide, por la misma razón que
+   * en closeMyAccount: un 401 haría que el front cierre la sesión). La sesión actual sigue vigente.
+   */
+  async changeMyPassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await authRepository.findActiveById(userId);
+    if (!user) throw new AppError(401, "UNAUTHORIZED", "El usuario ya no existe");
+
+    // Las cuentas creadas con Google no tienen contraseña que cambiar.
+    if (!user.password_hash) {
+      throw new AppError(409, "PASSWORD_NOT_SET", "Tu cuenta no tiene contraseña: inicia sesión con Google");
+    }
+    if (!(await bcrypt.compare(currentPassword, user.password_hash))) {
+      throw new AppError(403, "INVALID_PASSWORD", "La contraseña actual es incorrecta");
+    }
+    if (currentPassword === newPassword) {
+      throw new AppError(400, "PASSWORD_UNCHANGED", "La nueva contraseña debe ser distinta de la actual");
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    if (!(await usersRepository.updatePasswordHash(userId, passwordHash))) {
+      throw new AppError(401, "UNAUTHORIZED", "El usuario ya no existe");
+    }
   },
 
   listUsers: () => usersRepository.findAll(),

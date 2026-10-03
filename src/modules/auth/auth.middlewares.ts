@@ -24,15 +24,18 @@ export const fullNameSchema = z
   .min(2, "El nombre completo debe tener al menos 2 caracteres")
   .max(120, "El nombre completo es demasiado largo");
 
+/** Reglas de una contraseña nueva (registro y cambio de contraseña). */
+export const newPasswordSchema = z
+  .string({ error: "La contraseña es obligatoria" })
+  .min(8, "La contraseña debe tener al menos 8 caracteres")
+  // bcrypt solo usa los primeros 72 bytes; más allá se ignorarían en silencio.
+  .max(72, "La contraseña no puede superar 72 caracteres")
+  .regex(/^(?=.*[A-Za-z])(?=.*\d)/, "La contraseña debe contener al menos una letra y un número");
+
 const registerSchema = z.object({
   full_name: fullNameSchema,
   email: emailSchema,
-  password: z
-    .string({ error: "La contraseña es obligatoria" })
-    .min(8, "La contraseña debe tener al menos 8 caracteres")
-    // bcrypt solo usa los primeros 72 bytes; más allá se ignorarían en silencio.
-    .max(72, "La contraseña no puede superar 72 caracteres")
-    .regex(/^(?=.*[A-Za-z])(?=.*\d)/, "La contraseña debe contener al menos una letra y un número"),
+  password: newPasswordSchema,
 });
 
 const loginSchema = z.object({
