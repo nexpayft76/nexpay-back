@@ -66,6 +66,15 @@ export const transactionsRepository = {
     return rows[0] ?? null;
   },
 
+  /** Últimos movimientos de una wallet, del más nuevo al más viejo (los usa el asistente, solo lectura). */
+  async findRecentByWallet(walletId: string, limit = 10): Promise<TransactionRecord[]> {
+    const { rows } = await pool.query<TransactionRecord>(
+      "SELECT * FROM transactions WHERE wallet_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [walletId, limit],
+    );
+    return rows;
+  },
+
   /**
    * Aplica un cambio de moneda dentro de la transacción SQL de `client` (base: trabajo de Nelson):
    * bloquea los dos saldos, debita el origen solo si alcanza, acredita el destino y lo registra.
