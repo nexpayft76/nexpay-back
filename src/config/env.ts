@@ -29,6 +29,14 @@ const envSchema = z.object({
   // Comisión por compra/venta/intercambio, en % del monto de origen (1 = 1%).
   // 0 para la Demo 1 (sin comisión); se activa en la demo final (ej. 1).
   EXCHANGE_FEE_PERCENT: z.coerce.number().min(0).max(10).default(0),
+  // P2P: comisión que paga cada parte, en % de lo que recibe (0.5 = 0,5%).
+  P2P_FEE_PERCENT: z.coerce.number().min(0).max(10).default(0.5),
+  // P2P: cuánto puede alejarse la tasa del vendedor de la del mercado, en % (10 = ±10%).
+  P2P_MAX_RATE_DEVIATION_PERCENT: z.coerce.number().min(1).max(50).default(10),
+  // P2P: horas que dura una oferta abierta; al vencer, el dinero retenido vuelve al vendedor.
+  P2P_OFFER_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(72),
+  // P2P: máximo de ofertas abiertas por usuario a la vez.
+  P2P_MAX_OPEN_OFFERS: z.coerce.number().int().min(1).max(50).default(5),
   // Emails (separados por coma) que pueden usar el CRUD de administración: listar usuarios, billeteras,
   // saldos y transacciones de todos, editar usuarios y el catálogo de monedas. Vacío = nadie.
   ADMIN_EMAILS: z.string().default(""),

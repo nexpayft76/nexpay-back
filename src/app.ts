@@ -13,6 +13,7 @@ import {
   balancesRouter,
   currenciesRouter,
   notificationsRouter,
+  p2pRouter,
   transactionsRouter,
   usersRouter,
   walletsRouter,
@@ -58,6 +59,7 @@ app.use("/api/currencies", requireAuth, currenciesRouter);
 app.use("/api/transactions", requireAuth, transactionsRouter);
 app.use("/api/alerts", requireAuth, alertsRouter);
 app.use("/api/notifications", requireAuth, notificationsRouter);
+app.use("/api/p2p", requireAuth, p2pRouter);
 // Asistente con IA. Primero lo público (chat de la landing y estado de los modelos, sin datos de nadie);
 // el resto exige sesión (usa los datos del usuario, siempre en modo lectura).
 app.use("/api/assistant", assistantPublicRouter);

@@ -13,7 +13,7 @@ import { transactionsRepository, type TransactionType } from "./transactions.rep
 /** Monedas locales del corredor. Pagar con una local por una fuerte es BUY; al revés, SELL. */
 const LOCAL_CURRENCIES = new Set(["COP", "ARS"]);
 
-export type ExchangeType = Exclude<TransactionType, "DEPOSIT">;
+export type ExchangeType = Exclude<TransactionType, "DEPOSIT" | "P2P">;
 
 export interface ExchangeRequest {
   from_currency: string;

@@ -17,12 +17,14 @@ PostgreSQL en Railway. El esquema vive en este directorio y cambia **solo median
 | `migrations/008_user_theme.sql` | Preferencia de tema claro/oscuro por usuario para personalizar correos | Aplicado |
 | `migrations/009_user_notification_preferences.sql` | Preferencias de alertas y avisos por usuario, persistidas por cuenta | Aplicado |
 | `migrations/010_user_notifications.sql` | Historial de notificaciones in-app por usuario y lectura | Aplicado |
-| `migrations/013_session_version.sql` | Versión persistente para invalidar sesiones JWT tras recuperar la contraseña | Pendiente |
+| `migrations/013_session_version.sql` | Versión persistente para invalidar sesiones JWT tras recuperar la contraseña | Aplicado |
+| `migrations/014_p2p.sql` | Mercado P2P: tabla `p2p_offers` (monto retenido en garantía, tasa, comisión de cada parte), tipo `P2P` en `transactions`, emails `p2p` y reputación (intercambios completados) | Aplicado |
 
 ## Reglas que el código debe respetar
 
 - `users.status` solo acepta `active`, `suspended` o `closed`.
-- `transactions.type` solo acepta `BUY`, `SELL`, `EXCHANGE` o `DEPOSIT`.
+- `transactions.type` solo acepta `BUY`, `SELL`, `EXCHANGE`, `DEPOSIT` o `P2P`.
+- Una oferta P2P abierta tiene su `sell_amount` fuera del saldo del vendedor (retenido); al cancelarse o vencer vuelve a su saldo, y al aceptarse el intercambio se hace en una sola transacción SQL que bloquea las dos cuentas.
 - En un `DEPOSIT`, `from_currency` es `NULL`; en los demás tipos es obligatorio y distinto de `to_currency`.
 - `from_amount`, `to_amount` y `exchange_rate` deben ser **mayores que 0**.
 - `balances.amount` nunca puede ser negativo.

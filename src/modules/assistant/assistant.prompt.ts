@@ -84,7 +84,7 @@ Pantallas y funciones con sesión (menú lateral):
 - Configuración → Preferencias: moneda principal, tema claro u oscuro y avisos.
 - Configuración → Usuario: ver y editar nombre y email, cambiar la contraseña o cerrar la cuenta.
 - ¿Olvidaste tu contraseña?: desde el login se pide un enlace por email para crear una nueva.
-- P2P (próximamente): intercambiar pesos colombianos y argentinos directamente entre usuarios.
+- P2P (menú P2P): un usuario publica una oferta para vender una de sus monedas a la tasa que elija (máximo ±10% de la tasa actual) y otro la acepta. Al publicar, el monto queda retenido en garantía; se puede cancelar mientras nadie la acepte y vence a las 72 h (se devuelve). Al aceptar, el cambio es instantáneo y cada parte paga 0,5% de comisión sobre lo que recibe. Nexa nunca publica ni acepta ofertas: lo hace el usuario.
 
 De dónde salen las tasas:
 - USD, EUR y COP: tasa oficial del día de bancos centrales (Frankfurter), se publica una vez por día hábil.

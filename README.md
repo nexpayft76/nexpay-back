@@ -197,6 +197,10 @@ API en http://localhost:3000 · Swagger en http://localhost:3000/docs
 | `HISTORY_CACHE_TTL_SECONDS` | | `21600` | Caché del historial |
 | `DEMO_DEPOSITS_ENABLED` | | `true` | Permite recargas ficticias |
 | `EXCHANGE_FEE_PERCENT` | | `0` | Comisión de compra/venta en % (0 en la Demo 1) |
+| `P2P_FEE_PERCENT` | | `0.5` | Comisión P2P que paga cada parte, en % de lo que recibe |
+| `P2P_MAX_RATE_DEVIATION_PERCENT` | | `10` | Cuánto puede alejarse la tasa de una oferta P2P de la del mercado (±%) |
+| `P2P_OFFER_TTL_HOURS` | | `72` | Horas que dura una oferta P2P abierta antes de vencer |
+| `P2P_MAX_OPEN_OFFERS` | | `5` | Ofertas P2P abiertas por usuario a la vez |
 | `ADMIN_EMAILS` | | vacío | Emails con acceso al CRUD de administración |
 
 > Nunca subas el archivo `.env` al repositorio.

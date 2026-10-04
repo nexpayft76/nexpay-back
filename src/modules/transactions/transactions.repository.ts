@@ -4,7 +4,7 @@ import { pool, type Queryable } from "../../config/db";
 import { AppError } from "../../utils/app-error";
 import { walletsRepository } from "../wallets/wallets.repository";
 
-export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT";
+export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT" | "P2P";
 
 export interface TransactionRecord {
   id: string;
@@ -35,7 +35,7 @@ export interface CreateTransactionInput {
 /** Cambio ya calculado por el servicio (tasa del servidor y comisión). Los montos van como texto exacto. */
 export interface ExchangeInput {
   wallet_id: string;
-  type: Exclude<TransactionType, "DEPOSIT">;
+  type: Exclude<TransactionType, "DEPOSIT" | "P2P">;
   from_currency: string;
   to_currency: string;
   /** Total que se debita del origen, comisión incluida. */
