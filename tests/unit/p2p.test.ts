@@ -2,7 +2,7 @@ import "../helpers/test-env";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { buildP2PEmail } from "../../src/modules/notifications/notifications.templates";
-import { calculateOffer, publicName } from "../../src/modules/p2p/p2p.calc";
+import { calculateOffer, formatMoney, publicName } from "../../src/modules/p2p/p2p.calc";
 import { parseMarketFilters, parseOfferBody, parseOfferQuery } from "../../src/modules/p2p/p2p.middlewares";
 import { AppError } from "../../src/utils/app-error";
 
@@ -95,6 +95,12 @@ describe("P2P: validación", () => {
   it("los filtros del mercado son opcionales", () => {
     assert.deepEqual(parseMarketFilters({}), {});
     assert.deepEqual(parseMarketFilters({ sell_currency: "ars" }), { sell_currency: "ARS" });
+  });
+
+  it("los montos de los avisos van con 2 decimales como máximo", () => {
+    assert.equal(formatMoney("338300.00000000", "COP"), "338.300,00 COP");
+    assert.equal(formatMoney("0.75000000", "USD"), "0,75 USD");
+    assert.equal(formatMoney("150.03", "USD"), "150,03 USD");
   });
 
   it("en el mercado se ve solo el nombre y la inicial del apellido", () => {
