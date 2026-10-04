@@ -6,7 +6,7 @@ import { AppError } from "../../utils/app-error";
 const uuidRegex = /^[0-9a-fA-F-]{36}$/;
 const currencyCodeRegex = /^[A-Z0-9]{3,10}$/i;
 
-const transactionTypeSchema = z.enum(["BUY", "SELL", "EXCHANGE", "DEPOSIT"]);
+const transactionTypeSchema = z.enum(["BUY", "SELL", "EXCHANGE", "DEPOSIT", "P2P"]);
 
 const currencyField = (label: string) =>
   z

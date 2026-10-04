@@ -6,6 +6,7 @@ import {
   buildAlertEmail,
   buildDepositEmail,
   buildExchangeEmail,
+  buildP2PEmail,
   buildPasswordChangedEmail,
   buildPasswordResetEmail,
   buildWelcomeEmail,
@@ -16,6 +17,7 @@ import type {
   ExchangeNotificationData,
   NotificationEmailType,
   NotificationRecipient,
+  P2PEmailData,
 } from "./notifications.types";
 
 interface TrackedEmailInput {
@@ -181,6 +183,29 @@ export const notificationsService = {
         error: err instanceof Error ? err.message : String(err),
         email: data.user.email,
         transactionId: data.transaction_id,
+      });
+    }
+  },
+
+  /**
+   * 5. Email del mercado P2P (oferta publicada, vendida, comprada, cancelada o vencida).
+   */
+  async sendP2PEmail(data: P2PEmailData): Promise<void> {
+    try {
+      const email = buildP2PEmail({ ...data, user: await userWithSavedTheme(data.user) });
+      await sendAndRecordEmail({
+        user: data.user,
+        email_type: "p2p",
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      });
+    } catch (err) {
+      logger.error("Error al procesar el email P2P", {
+        error: err instanceof Error ? err.message : String(err),
+        email: data.user.email,
+        offerId: data.offer_id,
+        event: data.event,
       });
     }
   },
