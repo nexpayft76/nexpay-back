@@ -8,7 +8,7 @@ import { notificationsRepository } from "../notifications/notifications.reposito
 import { assertSupported, getRateSnapshot, quoteRate } from "../rates/rates.service";
 import { usersRepository } from "../users/users.repository";
 import { walletsRepository } from "../wallets/wallets.repository";
-import { calculateOffer, publicName, type P2PCalc } from "./p2p.calc";
+import { calculateOffer, formatMoney, publicName, type P2PCalc } from "./p2p.calc";
 import { p2pRepository, type P2PMarketRecord, type P2POfferRecord } from "./p2p.repository";
 
 export interface P2POfferInput {
@@ -158,7 +158,7 @@ async function releaseExpiredOffers(): Promise<void> {
         .create(offer.seller_user_id, {
           type: "system",
           title: "Tu oferta P2P venció",
-          message: `Nadie aceptó tu oferta a tiempo: los ${offer.sell_amount} ${offer.sell_currency} retenidos volvieron a tu saldo.`,
+          message: `Nadie aceptó tu oferta a tiempo: los ${formatMoney(offer.sell_amount, offer.sell_currency)} retenidos volvieron a tu saldo.`,
         })
         .catch(() => undefined);
       emailUser(offer.seller_user_id, {
@@ -239,7 +239,7 @@ export const p2pService = {
         .create(result.seller_user_id, {
           type: "system",
           title: "¡Aceptaron tu oferta P2P!",
-          message: `Vendiste ${offer.sell_amount} ${offer.sell_currency} y recibiste ${offer.seller_receives} ${offer.buy_currency} (comisión ${offer.seller_fee} ${offer.buy_currency}).`,
+          message: `Vendiste ${formatMoney(offer.sell_amount, offer.sell_currency)} y recibiste ${formatMoney(offer.seller_receives, offer.buy_currency)} (comisión ${formatMoney(offer.seller_fee, offer.buy_currency)}).`,
         })
         .catch(() => undefined);
     }

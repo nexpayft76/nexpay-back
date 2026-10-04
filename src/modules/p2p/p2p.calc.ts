@@ -94,3 +94,9 @@ export function publicName(fullName: string): string {
   const [first = "Usuario", second] = fullName.trim().split(/\s+/);
   return second ? `${first} ${second.charAt(0).toUpperCase()}.` : first;
 }
+
+/** Monto para mostrar a una persona: máximo 2 decimales y formato local ("338.300,00 COP"). */
+export function formatMoney(amount: string | number, currency: string): string {
+  const value = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(amount));
+  return `${value} ${currency}`;
+}
