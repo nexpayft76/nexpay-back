@@ -15,6 +15,8 @@ const user: AuthUserRecord = {
   email: "ana@nexpay.com",
   password_hash: "existing-hash",
   session_version: 0,
+  role: "user",
+  is_owner: false,
   status: "active",
   created_at: new Date("2026-03-05T10:00:00.000Z"),
   deleted_at: null,

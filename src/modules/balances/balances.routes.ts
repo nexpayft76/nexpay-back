@@ -2,7 +2,7 @@ import { Router } from "express";
 
 import { getBalance, getBalanceByWalletCurrency, listBalances } from "./balances.controller";
 import { validateBalanceId, validateWalletCurrencyParams } from "./balances.middlewares";
-import { requireAdmin } from "../auth/auth.middlewares";
+import { requireSuperuser } from "../auth/auth.middlewares";
 
 export const balancesRouter = Router();
 
@@ -16,7 +16,7 @@ export const balancesRouter = Router();
  *       200:
  *         description: Lista de balances
  */
-balancesRouter.get("/", requireAdmin, listBalances);
+balancesRouter.get("/", requireSuperuser, listBalances);
 
 /**
  * @openapi
@@ -41,7 +41,7 @@ balancesRouter.get("/", requireAdmin, listBalances);
  *       404:
  *         description: Balance no encontrado
  */
-balancesRouter.get("/wallet/:walletId/currency/:currencyCode", requireAdmin, validateWalletCurrencyParams, getBalanceByWalletCurrency);
+balancesRouter.get("/wallet/:walletId/currency/:currencyCode", requireSuperuser, validateWalletCurrencyParams, getBalanceByWalletCurrency);
 
 /**
  * @openapi
@@ -61,4 +61,4 @@ balancesRouter.get("/wallet/:walletId/currency/:currencyCode", requireAdmin, val
  *       404:
  *         description: Balance no encontrado
  */
-balancesRouter.get("/:id", requireAdmin, validateBalanceId, getBalance);
+balancesRouter.get("/:id", requireSuperuser, validateBalanceId, getBalance);

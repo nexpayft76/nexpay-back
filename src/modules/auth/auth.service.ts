@@ -34,6 +34,8 @@ export function toPublicUser(user: AuthUserRecord): PublicUser {
     full_name: user.full_name,
     email: user.email,
     status: user.status,
+    role: user.role,
+    is_owner: user.is_owner,
     created_at: user.created_at.toISOString(),
   };
 }

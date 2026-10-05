@@ -2,7 +2,7 @@ import { Router } from "express";
 
 import { rateLimit } from "../../middlewares/rate-limit.middleware";
 import { getAuth } from "../auth/auth.middlewares";
-import { acceptOffer, cancelOffer, createOffer, listMarket, listMine, quote } from "./p2p.controller";
+import { acceptOffer, cancelOffer, createOffer, listMarket, listMine, listMyTrades, quote } from "./p2p.controller";
 import { validateOffer, validateOfferId } from "./p2p.middlewares";
 
 export const p2pRouter = Router();
@@ -102,6 +102,21 @@ p2pRouter.post("/offers", moneyLimit, validateOffer, createOffer);
  *       200: { description: Ofertas del usuario }
  */
 p2pRouter.get("/offers/me", listMine);
+
+/**
+ * @openapi
+ * /api/p2p/trades/me:
+ *   get:
+ *     summary: Mis intercambios P2P completados (como vendedor o comprador)
+ *     description: Con lo que pagué, lo que recibí, la comisión, la tasa y la otra parte (nombre e inicial).
+ *     tags: [P2P]
+ *     parameters:
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 20, maximum: 50 } }
+ *     responses:
+ *       200: { description: "{ items, page, limit, total }" }
+ */
+p2pRouter.get("/trades/me", listMyTrades);
 
 /**
  * @openapi

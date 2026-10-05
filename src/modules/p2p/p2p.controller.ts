@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 
 import { getAuth } from "../auth/auth.middlewares";
-import { parseMarketFilters, parseOfferQuery, type OfferBody } from "./p2p.middlewares";
+import { parseMarketFilters, parseOfferQuery, parseTradesPage, type OfferBody } from "./p2p.middlewares";
 import { p2pService } from "./p2p.service";
 
 /** Simula una oferta: tasa actual, límites, comisión y lo que recibe cada parte. No mueve saldos. */
@@ -19,6 +19,11 @@ export async function createOffer(req: Request, res: Response): Promise<void> {
 export async function listMarket(req: Request, res: Response): Promise<void> {
   const offers = await p2pService.listMarket(getAuth(req).userId, parseMarketFilters(req.query));
   res.status(200).json({ data: offers });
+}
+
+/** Historial de intercambios P2P completados del usuario autenticado. */
+export async function listMyTrades(req: Request, res: Response): Promise<void> {
+  res.status(200).json({ data: await p2pService.listMyTrades(getAuth(req).userId, parseTradesPage(req.query)) });
 }
 
 /** Ofertas del usuario autenticado. */

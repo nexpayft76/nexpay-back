@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
 import { AppError } from "../../utils/app-error";
+import { pageSchema } from "../transactions/transactions.middlewares";
 
 const uuidRegex = /^[0-9a-fA-F-]{36}$/;
 
@@ -94,6 +95,20 @@ export function parseMarketFilters(query: unknown): z.output<typeof marketFilter
   const result = marketFilterSchema.safeParse(query);
   if (!result.success) {
     throw new AppError(400, "INVALID_P2P_FILTERS", "Filtros inválidos", result.error.issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+    })));
+  }
+  return result.data;
+}
+
+const tradesPageSchema = pageSchema.strict();
+
+/** Página del historial de intercambios: ?page=1&limit=20. */
+export function parseTradesPage(query: unknown): z.output<typeof tradesPageSchema> {
+  const result = tradesPageSchema.safeParse(query);
+  if (!result.success) {
+    throw new AppError(400, "INVALID_HISTORY_QUERY", "Filtros del historial inválidos", result.error.issues.map((issue) => ({
       path: issue.path.join("."),
       message: issue.message,
     })));

@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "tsx --import ./tests/helpers/test-env.ts --test tests/unit/*.test.ts tests/integration/*.test.ts",
-    "db:sql": "tsx scripts/run-sql.ts"
+    "db:sql": "tsx scripts/run-sql.ts",
+    "db:superuser": "tsx scripts/create-superuser.ts"
   },
   "repository": {
     "type": "git",

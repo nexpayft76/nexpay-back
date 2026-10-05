@@ -19,10 +19,14 @@ PostgreSQL en Railway. El esquema vive en este directorio y cambia **solo median
 | `migrations/010_user_notifications.sql` | Historial de notificaciones in-app por usuario y lectura | Aplicado |
 | `migrations/013_session_version.sql` | Versión persistente para invalidar sesiones JWT tras recuperar la contraseña | Aplicado |
 | `migrations/014_p2p.sql` | Mercado P2P: tabla `p2p_offers` (monto retenido en garantía, tasa, comisión de cada parte), tipo `P2P` en `transactions`, emails `p2p` y reputación (intercambios completados) | Aplicado |
+| `migrations/015_roles_tesoreria.sql` | Roles (`user` y `superuser`), cuenta propietaria única (`is_owner`) y tabla `platform_fees` (cada comisión cobrada y a qué billetera se acreditó) | Aplicado |
+| `migrations/016_platform_settings.sql` | Tabla `platform_settings`: comisiones del intercambio de balance y P2P que decide el superusuario desde su panel | Aplicado |
 
 ## Reglas que el código debe respetar
 
 - `users.status` solo acepta `active`, `suspended` o `closed`.
+- `users.role` solo acepta `user` o `superuser`. Hay una sola cuenta propietaria (`is_owner`): siempre es superusuario, recibe todas las comisiones y no se puede degradar, suspender ni borrar. Se crea con `npm run db:superuser`.
+- Toda comisión cobrada se acredita a la billetera propietaria y se registra en `platform_fees` dentro de la misma transacción SQL de la operación.
 - `transactions.type` solo acepta `BUY`, `SELL`, `EXCHANGE`, `DEPOSIT` o `P2P`.
 - Una oferta P2P abierta tiene su `sell_amount` fuera del saldo del vendedor (retenido); al cancelarse o vencer vuelve a su saldo, y al aceptarse el intercambio se hace en una sola transacción SQL que bloquea las dos cuentas.
 - En un `DEPOSIT`, `from_currency` es `NULL`; en los demás tipos es obligatorio y distinto de `to_currency`.

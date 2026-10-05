@@ -84,8 +84,8 @@ describe("Notifications Module - AWS SES Emails", () => {
 
     const email = buildExchangeEmail(exchangeData);
 
-    assert.ok(email.subject.includes("Compra de Divisa"));
-    assert.ok(email.html.includes("Compra de Divisa"));
+    assert.ok(email.subject.includes("Intercambio de balance"));
+    assert.ok(email.html.includes("Intercambio de balance"));
     assert.ok(email.html.includes("100000.00 COP"));
     assert.ok(email.html.includes("+25.00 USD"));
     assert.ok(email.html.includes("tx-12345-abcde"));

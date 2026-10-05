@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 
 import { getAuth } from "../auth/auth.middlewares";
-import { parseExchangeQuery, type ExchangeBody } from "./transactions.middlewares";
+import { parseExchangeQuery, parseHistoryQuery, type ExchangeBody } from "./transactions.middlewares";
 import { transactionsService } from "./transactions.service";
 
 export async function listTransactions(_req: Request, res: Response): Promise<void> {
@@ -19,6 +19,12 @@ export async function getTransaction(req: Request, res: Response): Promise<void>
   }
 
   res.status(200).json({ data: transaction });
+}
+
+/** Historial de la cuenta del usuario autenticado (recargas, compras, ventas e intercambios), paginado. */
+export async function listMyTransactions(req: Request, res: Response): Promise<void> {
+  const page = await transactionsService.listMine(getAuth(req).userId, parseHistoryQuery(req.query));
+  res.status(200).json({ data: page });
 }
 
 /** Cotización exacta de un cambio (tasa + comisión), para mostrar antes de confirmar. */

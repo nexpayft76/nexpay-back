@@ -260,12 +260,8 @@ export function formatBalance(value: string | number | null | undefined, decimal
  * 2. Email de resumen de transacción (Compra / Venta / Intercambio)
  */
 export function buildExchangeEmail(data: ExchangeNotificationData): { subject: string; html: string; text: string } {
-  const typeLabels: Record<string, string> = {
-    BUY: "Compra de Divisa",
-    SELL: "Venta de Divisa",
-    EXCHANGE: "Intercambio de Monedas",
-  };
-  const operationTitle = typeLabels[data.type] ?? "Transacción";
+  // Compra, venta e intercambio son la misma operación para el usuario: un intercambio de balance.
+  const operationTitle = "Intercambio de balance";
   const subject = `Resumen de tu transacción: ${operationTitle} en NexPay`;
   const firstName = data.user.full_name.split(" ")[0] || data.user.full_name;
 
