@@ -1,4 +1,4 @@
-import { env } from "../../config/env";
+import { settingsService } from "../settings/settings.service";
 import { ARS_RATE_TYPES, type ArsRateType } from "../../integrations/dolarapi.client";
 import { createChatCompletion, getModelStatuses, modelLabel, type ChatMessage, type ModelStatus } from "../../integrations/openrouter.client";
 import { logger } from "../../utils/logger";
@@ -91,7 +91,7 @@ async function loadUserData(
 export async function buildPublicContext(): Promise<AssistantPublicContext> {
   return {
     now: new Date().toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "full", timeStyle: "short" }),
-    feePercent: env.EXCHANGE_FEE_PERCENT,
+    feePercent: (await settingsService.getFees()).exchange_fee_percent,
     depositLimits: DEPOSIT_LIMITS,
     ...(await loadRates()),
   };

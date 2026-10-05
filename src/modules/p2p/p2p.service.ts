@@ -6,6 +6,7 @@ import { alertsService } from "../alerts/alerts.service";
 import { notificationsService, type P2PEmailData } from "../notifications";
 import { notificationsRepository } from "../notifications/notifications.repository";
 import { assertSupported, getRateSnapshot, quoteRate } from "../rates/rates.service";
+import { settingsService } from "../settings/settings.service";
 import { usersRepository } from "../users/users.repository";
 import { walletsRepository } from "../wallets/wallets.repository";
 import { calculateOffer, formatMoney, publicName, type P2PCalc } from "./p2p.calc";
@@ -149,7 +150,7 @@ async function buildQuote(input: P2PQuoteInput): Promise<P2PQuote> {
     buyDecimals: buy.decimals,
     rate: input.rate ?? marketRate,
     marketRate,
-    feePercent: env.P2P_FEE_PERCENT,
+    feePercent: (await settingsService.getFees()).p2p_fee_percent,
     maxDeviationPercent: env.P2P_MAX_RATE_DEVIATION_PERCENT,
   });
 

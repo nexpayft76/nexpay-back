@@ -1,5 +1,4 @@
 import { withTransaction } from "../../config/db";
-import { env } from "../../config/env";
 import type { ArsRateType } from "../../integrations/dolarapi.client";
 import { AppError } from "../../utils/app-error";
 import { roundTo } from "../../utils/money";
@@ -7,6 +6,7 @@ import { assertSupported, getRateSnapshot, quoteRate, type ArsRateUsed, type Rat
 import { usersRepository } from "../users/users.repository";
 import { notificationsService } from "../notifications";
 import { alertsService } from "../alerts/alerts.service";
+import { settingsService } from "../settings/settings.service";
 import { walletsRepository } from "../wallets/wallets.repository";
 import { BALANCE_EXCHANGE_TYPES, OWN_TRANSACTION_TYPES, type HistoryQuery } from "./transactions.middlewares";
 import { transactionsRepository, type TransactionType } from "./transactions.repository";
@@ -86,7 +86,8 @@ async function buildQuote(input: ExchangeRequest): Promise<ExchangeQuote> {
 
   const { rate, ars_rate } = quoteRate(snapshot, from.code, to.code, input.ars_rate);
 
-  const feePercent = env.EXCHANGE_FEE_PERCENT;
+  // La decide el superusuario desde su panel (si no la cambió, vale EXCHANGE_FEE_PERCENT).
+  const feePercent = (await settingsService.getFees()).exchange_fee_percent;
   const feeMinor = Math.round((totalMinor * feePercent) / 100);
   const convertedMinor = totalMinor - feeMinor;
   const toAmount = roundTo((convertedMinor / fromScale) * rate, to.decimals);

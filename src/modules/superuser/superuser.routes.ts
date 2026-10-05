@@ -1,7 +1,17 @@
 import { Router } from "express";
 
-import { feesSummary, listFees, listOffers, listTransactions, listUsers, setRole, setStatus } from "./superuser.controller";
-import { validateRole, validateStatus, validateUserIdParam } from "./superuser.middlewares";
+import {
+  feesSummary,
+  getFeeSettings,
+  listFees,
+  listOffers,
+  listTransactions,
+  listUsers,
+  setRole,
+  setStatus,
+  updateFeeSettings,
+} from "./superuser.controller";
+import { validateFees, validateRole, validateStatus, validateUserIdParam } from "./superuser.middlewares";
 
 /** Todo lo de aquí exige sesión y rol de superusuario (se monta con requireAuth + requireSuperuser en app.ts). */
 export const superuserRouter = Router();
@@ -77,6 +87,34 @@ superuserRouter.patch("/users/:id/status", validateUserIdParam, validateStatus, 
  *       200: { description: "{ items, page, limit, total }" }
  */
 superuserRouter.get("/fees/summary", feesSummary);
+
+/**
+ * @openapi
+ * /api/superuser/settings/fees:
+ *   get:
+ *     summary: Comisiones vigentes (intercambio de balance y P2P)
+ *     tags: [Superuser]
+ *     responses:
+ *       200: { description: "{ exchange_fee_percent, p2p_fee_percent, updated_at, updated_by_email }" }
+ *   patch:
+ *     summary: Cambiar las comisiones (0 a 10 %, hasta 4 decimales)
+ *     description: Rigen desde la próxima operación. Las ofertas P2P ya publicadas conservan la comisión con la que se publicaron.
+ *     tags: [Superuser]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               exchange_fee_percent: { type: number, example: 0.05 }
+ *               p2p_fee_percent: { type: number, example: 0.5 }
+ *     responses:
+ *       200: { description: Comisiones actualizadas }
+ *       400: { description: Valor fuera de rango (INVALID_FEES) }
+ */
+superuserRouter.get("/settings/fees", getFeeSettings);
+superuserRouter.patch("/settings/fees", validateFees, updateFeeSettings);
 superuserRouter.get("/fees", listFees);
 
 /**

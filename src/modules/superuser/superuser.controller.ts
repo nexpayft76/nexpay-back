@@ -6,9 +6,11 @@ import {
   parseOffersQuery,
   parseTransactionsQuery,
   parseUsersQuery,
+  type FeesBody,
   type RoleBody,
   type StatusBody,
 } from "./superuser.middlewares";
+import { settingsService } from "../settings/settings.service";
 import { superuserService } from "./superuser.service";
 
 /** Usuarios registrados, con búsqueda por correo. */
@@ -31,6 +33,16 @@ export async function setStatus(req: Request, res: Response): Promise<void> {
 /** Comisiones cobradas por moneda y el saldo de la billetera propietaria. */
 export async function feesSummary(_req: Request, res: Response): Promise<void> {
   res.status(200).json({ data: await superuserService.feesSummary() });
+}
+
+/** Comisiones vigentes (intercambio de balance y P2P) y quién las cambió por última vez. */
+export async function getFeeSettings(_req: Request, res: Response): Promise<void> {
+  res.status(200).json({ data: await settingsService.getFeesView() });
+}
+
+/** Cambia las comisiones: rigen desde la próxima operación (las ofertas P2P ya publicadas conservan la suya). */
+export async function updateFeeSettings(req: Request, res: Response): Promise<void> {
+  res.status(200).json({ data: await settingsService.updateFees(getAuth(req).userId, req.body as FeesBody) });
 }
 
 /** Detalle de las comisiones cobradas, de la más nueva a la más vieja. */

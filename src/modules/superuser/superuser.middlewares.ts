@@ -48,6 +48,36 @@ const statusSchema = z
   .object({ status: z.enum(["active", "suspended"], { error: "El estado debe ser active o suspended" }) })
   .strict();
 
+/** Porcentaje de comisión: 0 a 10 %, hasta 4 decimales (0.05 = 0,05%). */
+const feePercent = (label: string) =>
+  z
+    .number({ error: `La comisión ${label} debe ser un número` })
+    .min(0, `La comisión ${label} no puede ser negativa`)
+    .max(10, `La comisión ${label} puede ser como máximo 10%`)
+    .refine((value) => Math.abs(value * 10_000 - Math.round(value * 10_000)) < 1e-6, {
+      message: `La comisión ${label} admite como máximo 4 decimales`,
+    });
+
+const feesSchema = z
+  .object({
+    exchange_fee_percent: feePercent("del intercambio de balance").optional(),
+    p2p_fee_percent: feePercent("P2P").optional(),
+  })
+  .strict()
+  .refine((input) => input.exchange_fee_percent !== undefined || input.p2p_fee_percent !== undefined, {
+    message: "Indica al menos una comisión",
+  });
+
+export type FeesBody = z.output<typeof feesSchema>;
+
+export function validateFees(req: Request, _res: Response, next: NextFunction): void {
+  req.body = parse(feesSchema, req.body, "INVALID_FEES", "Comisiones inválidas");
+  next();
+}
+
+/** Para los tests. */
+export const parseFeesBody = (value: unknown) => parse(feesSchema, value, "INVALID_FEES", "Comisiones inválidas");
+
 export type RoleBody = z.output<typeof roleSchema>;
 export type StatusBody = z.output<typeof statusSchema>;
 

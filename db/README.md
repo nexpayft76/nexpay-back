@@ -19,7 +19,8 @@ PostgreSQL en Railway. El esquema vive en este directorio y cambia **solo median
 | `migrations/010_user_notifications.sql` | Historial de notificaciones in-app por usuario y lectura | Aplicado |
 | `migrations/013_session_version.sql` | Versión persistente para invalidar sesiones JWT tras recuperar la contraseña | Aplicado |
 | `migrations/014_p2p.sql` | Mercado P2P: tabla `p2p_offers` (monto retenido en garantía, tasa, comisión de cada parte), tipo `P2P` en `transactions`, emails `p2p` y reputación (intercambios completados) | Aplicado |
-| `migrations/015_roles_tesoreria.sql` | Roles (`user` y `superuser`), cuenta propietaria única (`is_owner`) y tabla `platform_fees` (cada comisión cobrada y a qué billetera se acreditó) | Pendiente |
+| `migrations/015_roles_tesoreria.sql` | Roles (`user` y `superuser`), cuenta propietaria única (`is_owner`) y tabla `platform_fees` (cada comisión cobrada y a qué billetera se acreditó) | Aplicado |
+| `migrations/016_platform_settings.sql` | Tabla `platform_settings`: comisiones del intercambio de balance y P2P que decide el superusuario desde su panel | Aplicado |
 
 ## Reglas que el código debe respetar
 

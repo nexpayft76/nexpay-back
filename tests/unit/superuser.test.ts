@@ -4,7 +4,10 @@ import { afterEach, describe, it, mock } from "node:test";
 import type { PoolClient } from "pg";
 import { superuserRepository, type ManagedUserRecord } from "../../src/modules/superuser/superuser.repository";
 import { superuserService } from "../../src/modules/superuser/superuser.service";
-import { parseUsersQuery } from "../../src/modules/superuser/superuser.middlewares";
+import { pool } from "../../src/config/db";
+import { env } from "../../src/config/env";
+import { settingsService } from "../../src/modules/settings/settings.service";
+import { parseFeesBody, parseUsersQuery } from "../../src/modules/superuser/superuser.middlewares";
 import { treasuryRepository } from "../../src/modules/treasury/treasury.repository";
 import { walletsRepository } from "../../src/modules/wallets/wallets.repository";
 import { AppError } from "../../src/utils/app-error";
@@ -112,5 +115,24 @@ describe("Tesorería: comisiones a la cuenta propietaria", () => {
     assert.equal(credit.mock.callCount(), 0);
     assert.equal(inserts.length, 1);
     assert.equal(inserts[0]?.[6], null);
+  });
+});
+
+describe("Comisiones configurables", () => {
+  it("acepta de 0 a 10 % con hasta 4 decimales, y al menos una comisión", () => {
+    assert.deepEqual(parseFeesBody({ exchange_fee_percent: 0.05 }), { exchange_fee_percent: 0.05 });
+    assert.deepEqual(parseFeesBody({ p2p_fee_percent: 0 }), { p2p_fee_percent: 0 });
+    for (const body of [{}, { exchange_fee_percent: -1 }, { exchange_fee_percent: 11 }, { p2p_fee_percent: 0.12345 }, { otra: 1 }]) {
+      assert.throws(() => parseFeesBody(body), AppError);
+    }
+  });
+
+  it("si la base no responde, las operaciones usan las comisiones de las variables de entorno", async () => {
+    settingsService.clearCache();
+    mock.method(pool, "query", async () => {
+      throw new Error("sin conexión");
+    });
+    const fees = await settingsService.getFees();
+    assert.deepEqual(fees, { exchange_fee_percent: env.EXCHANGE_FEE_PERCENT, p2p_fee_percent: env.P2P_FEE_PERCENT });
   });
 });

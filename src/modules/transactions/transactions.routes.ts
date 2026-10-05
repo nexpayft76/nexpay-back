@@ -91,7 +91,7 @@ transactionsRouter.get("/me/exchange/quote", quoteExchange);
  *     summary: Comprar, vender o intercambiar monedas en mi wallet
  *     description: |
  *       El usuario se toma del token y la tasa la calcula el servidor en el momento (nunca se aceptan wallet_id ni exchange_rate).
- *       Cobra la comisión EXCHANGE_FEE_PERCENT sobre el monto de origen (0 en la Demo 1: sin comisión). Debita, acredita y registra en una sola transacción SQL.
+ *       Cobra la comisión del intercambio de balance (la define el superusuario; por defecto EXCHANGE_FEE_PERCENT) sobre el monto de origen. Debita, acredita y registra en una sola transacción SQL.
  *       Base: compra de monedas de Nelson (POST /buy), adaptada.
  *     tags: [Transactions]
  *     requestBody:
