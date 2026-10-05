@@ -187,14 +187,14 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
 }
 
 /**
- * Solo administradores (email en ADMIN_EMAILS). Va después de `requireAuth`.
- * Protege el CRUD que ve o modifica datos de TODOS los usuarios: un usuario común solo usa las rutas /me.
+ * Solo superusuarios: ven y gestionan a todos los usuarios y todo el sistema. Va después de `requireAuth`.
+ * El rol se lee de la base en cada petición (no del token): si le quitan el rol, deja de entrar al instante.
  */
-export async function requireAdmin(req: Request, _res: Response, next: NextFunction): Promise<void> {
+export async function requireSuperuser(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const auth = getAuth(req);
   const user = await authRepository.findActiveById(auth.userId);
-  if (!user || !env.adminEmails.has(user.email.toLowerCase())) {
-    throw new AppError(403, "FORBIDDEN", "Esta operación es solo para administradores");
+  if (!user || user.role !== "superuser") {
+    throw new AppError(403, "FORBIDDEN", "Esta operación es solo para el superusuario");
   }
   next();
 }

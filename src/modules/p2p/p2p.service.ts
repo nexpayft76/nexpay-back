@@ -9,7 +9,7 @@ import { assertSupported, getRateSnapshot, quoteRate } from "../rates/rates.serv
 import { usersRepository } from "../users/users.repository";
 import { walletsRepository } from "../wallets/wallets.repository";
 import { calculateOffer, formatMoney, publicName, type P2PCalc } from "./p2p.calc";
-import { p2pRepository, type P2PMarketRecord, type P2POfferRecord } from "./p2p.repository";
+import { p2pRepository, type P2PMarketRecord, type P2POfferRecord, type P2PTradeRecord } from "./p2p.repository";
 
 export interface P2POfferInput {
   sell_currency: string;
@@ -55,6 +55,49 @@ export interface P2PMarketOffer extends P2POfferView {
   seller_name: string;
   /** Reputación: intercambios P2P completados por el vendedor. */
   completed_trades: number;
+}
+
+/** Intercambio P2P completado, visto por una de las partes. */
+export interface P2PTradeView {
+  offer_id: string;
+  /** "seller" si publicó la oferta; "buyer" si la aceptó. */
+  role: "seller" | "buyer";
+  /** La otra parte, solo con nombre e inicial del apellido. */
+  counterpart_name: string;
+  paid_amount: string;
+  paid_currency: string;
+  received_amount: string;
+  received_currency: string;
+  fee_amount: string;
+  fee_currency: string;
+  fee_percent: number;
+  /** Tasa de la oferta: unidades de buy_currency por 1 de sell_currency. */
+  rate: number;
+  sell_currency: string;
+  buy_currency: string;
+  transaction_id: string | null;
+  completed_at: string;
+}
+
+function toTradeView(trade: P2PTradeRecord, walletId: string): P2PTradeView {
+  const isSeller = trade.seller_wallet_id === walletId;
+  return {
+    offer_id: trade.id,
+    role: isSeller ? "seller" : "buyer",
+    counterpart_name: publicName(isSeller ? trade.buyer_name : trade.seller_name),
+    paid_amount: isSeller ? trade.sell_amount : trade.buy_amount,
+    paid_currency: isSeller ? trade.sell_currency : trade.buy_currency,
+    received_amount: isSeller ? trade.seller_receives : trade.buyer_receives,
+    received_currency: isSeller ? trade.buy_currency : trade.sell_currency,
+    fee_amount: isSeller ? trade.seller_fee : trade.buyer_fee,
+    fee_currency: isSeller ? trade.buy_currency : trade.sell_currency,
+    fee_percent: Number(trade.fee_percent),
+    rate: Number(trade.rate),
+    sell_currency: trade.sell_currency,
+    buy_currency: trade.buy_currency,
+    transaction_id: isSeller ? trade.seller_tx_id : trade.buyer_tx_id,
+    completed_at: (trade.closed_at ?? trade.created_at).toISOString(),
+  };
 }
 
 function toView(offer: P2POfferRecord): P2POfferView {
@@ -212,6 +255,13 @@ export const p2pService = {
     await releaseExpiredOffers();
     const offers = await p2pRepository.listOpen({ exclude_wallet_id: walletId, ...filters, limit: 50 });
     return offers.map(toMarketView);
+  },
+
+  /** Historial de intercambios P2P completados del usuario (como vendedor o comprador), paginado. */
+  async listMyTrades(userId: string, page: { page: number; limit: number }): Promise<{ items: P2PTradeView[]; page: number; limit: number; total: number }> {
+    const walletId = await requireWallet(userId);
+    const { rows, total } = await p2pRepository.listTradesByWallet(walletId, page.limit, (page.page - 1) * page.limit);
+    return { items: rows.map((trade) => toTradeView(trade, walletId)), page: page.page, limit: page.limit, total };
   },
 
   /** Ofertas propias (abiertas y cerradas). */

@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 
 import { pool, type Queryable } from "../../config/db";
 import { AppError } from "../../utils/app-error";
+import { treasuryRepository } from "../treasury/treasury.repository";
 import { walletsRepository } from "../wallets/wallets.repository";
 import type { P2PCalc } from "./p2p.calc";
 
@@ -36,6 +37,12 @@ export interface P2PMarketRecord extends P2POfferRecord {
   seller_user_id: string;
   /** Intercambios P2P completados por el vendedor (como vendedor o comprador). */
   completed_trades: number;
+}
+
+/** Intercambio completado, con el nombre de las dos partes. */
+export interface P2PTradeRecord extends P2POfferRecord {
+  seller_name: string;
+  buyer_name: string;
 }
 
 /** Oferta vencida: lo retenido vuelve al vendedor. */
@@ -184,6 +191,28 @@ export const p2pRepository = {
     return rows;
   },
 
+  /** Intercambios completados en los que participó una wallet (como vendedor o comprador), paginados. */
+  async listTradesByWallet(walletId: string, limit: number, offset: number): Promise<{ rows: P2PTradeRecord[]; total: number }> {
+    const [list, count] = await Promise.all([
+      pool.query<P2PTradeRecord>(
+        `SELECT ${OFFER_COLUMNS}, su.full_name AS seller_name, bu.full_name AS buyer_name
+         FROM p2p_offers o
+         JOIN wallets sw ON sw.id = o.seller_wallet_id JOIN users su ON su.id = sw.user_id
+         JOIN wallets bw ON bw.id = o.buyer_wallet_id JOIN users bu ON bu.id = bw.user_id
+         WHERE o.status = 'completed' AND (o.seller_wallet_id = $1 OR o.buyer_wallet_id = $1)
+         ORDER BY o.closed_at DESC
+         LIMIT $2 OFFSET $3`,
+        [walletId, limit, offset],
+      ),
+      pool.query<{ total: number }>(
+        `SELECT count(*)::int AS total FROM p2p_offers
+         WHERE status = 'completed' AND (seller_wallet_id = $1 OR buyer_wallet_id = $1)`,
+        [walletId],
+      ),
+    ]);
+    return { rows: list.rows, total: count.rows[0]?.total ?? 0 };
+  },
+
   /** Ofertas publicadas por una wallet (todas, de la más nueva a la más vieja). */
   async listBySeller(walletId: string, limit = 50): Promise<P2POfferRecord[]> {
     const { rows } = await pool.query<P2POfferRecord>(
@@ -243,6 +272,26 @@ export const p2pRepository = {
       fee_amount: offer.buyer_fee,
       fee_percent: offer.fee_percent,
     });
+
+    // Las comisiones de las dos partes, cada una en la moneda en que se cobró, van a la cuenta propietaria.
+    await treasuryRepository.collect(client, [
+      {
+        source: "p2p",
+        currency: offer.buy_currency,
+        amount: offer.seller_fee,
+        payer_wallet_id: offer.seller_wallet_id,
+        transaction_id: sellerTx,
+        offer_id: offer.id,
+      },
+      {
+        source: "p2p",
+        currency: offer.sell_currency,
+        amount: offer.buyer_fee,
+        payer_wallet_id: input.buyer_wallet_id,
+        transaction_id: buyerTx,
+        offer_id: offer.id,
+      },
+    ]);
 
     const updated = await client.query<P2POfferRecord>(
       `UPDATE p2p_offers o

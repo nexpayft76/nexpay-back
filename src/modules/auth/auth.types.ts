@@ -1,5 +1,8 @@
 export type UserStatus = "active" | "suspended" | "closed";
 
+/** Solo dos roles: el usuario común (todo el que se registra) y el superusuario. */
+export type UserRole = "user" | "superuser";
+
 /** Datos del token que `requireAuth` deja en `req.auth`. */
 export interface AuthContext {
   userId: string;
@@ -15,6 +18,9 @@ export interface PublicUser {
   full_name: string;
   email: string;
   status: UserStatus;
+  role: UserRole;
+  /** true solo en la cuenta propietaria de NexPay (recibe las comisiones). */
+  is_owner: boolean;
   created_at: string;
 }
 

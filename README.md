@@ -44,7 +44,7 @@ Tasas de cambio (sin API key):
   - todo en una transacción SQL (sin saldos negativos ni operaciones a medias).
 - **Tasas:** tabla de tasas, conversión, cotizaciones del dólar en Argentina e historial para gráficos.
   - Caché y respaldo de la última tasa válida si un proveedor falla.
-- **CRUD de administración** (usuarios, billeteras, saldos, transacciones y monedas): solo para los emails de `ADMIN_EMAILS`.
+- **Roles**: usuario (todo el que se registra) y superusuario. El superusuario ve y gestiona a todos los usuarios (roles y suspensión), todas las transacciones, todo el P2P y las comisiones; la cuenta propietaria recibe las comisiones en su billetera. El CRUD de administración (usuarios, billeteras, saldos, transacciones y monedas) es solo para superusuarios.
 - **Seguridad:**
   - CORS con lista de orígenes;
   - protección CSRF (SameSite + verificación de origen);
@@ -178,6 +178,7 @@ API en http://localhost:3000 · Swagger en http://localhost:3000/docs
 | `npm test` | Tests unitarios y de integración (sin base de datos: los repositorios se simulan) |
 | `TEST_DATABASE_URL=postgresql://…/nexpay_test npm test` | Además corre los tests contra una PostgreSQL real y descartable (con `db/schema.sql` y las migraciones aplicadas). El nombre de la base debe incluir `test` |
 | `npm run db:sql -- <archivo.sql>` | Ejecuta SQL contra `DATABASE_URL` |
+| `npm run db:superuser` | Crea la cuenta propietaria (superusuario que recibe las comisiones) con `SUPERUSER_EMAIL`, `SUPERUSER_PASSWORD` y `SUPERUSER_NAME` del entorno |
 
 ---
 
@@ -196,12 +197,11 @@ API en http://localhost:3000 · Swagger en http://localhost:3000/docs
 | `ARS_RATES_CACHE_TTL_SECONDS` | | `300` | Caché de DolarApi |
 | `HISTORY_CACHE_TTL_SECONDS` | | `21600` | Caché del historial |
 | `DEMO_DEPOSITS_ENABLED` | | `true` | Permite recargas ficticias |
-| `EXCHANGE_FEE_PERCENT` | | `0` | Comisión de compra/venta en % (0 en la Demo 1) |
+| `EXCHANGE_FEE_PERCENT` | | `0.05` | Comisión del intercambio de balance, en % del monto de origen (0,05%) |
 | `P2P_FEE_PERCENT` | | `0.5` | Comisión P2P que paga cada parte, en % de lo que recibe |
 | `P2P_MAX_RATE_DEVIATION_PERCENT` | | `10` | Cuánto puede alejarse la tasa de una oferta P2P de la del mercado (±%) |
 | `P2P_OFFER_TTL_HOURS` | | `72` | Horas que dura una oferta P2P abierta antes de vencer |
 | `P2P_MAX_OPEN_OFFERS` | | `5` | Ofertas P2P abiertas por usuario a la vez |
-| `ADMIN_EMAILS` | | vacío | Emails con acceso al CRUD de administración |
 
 > Nunca subas el archivo `.env` al repositorio.
 

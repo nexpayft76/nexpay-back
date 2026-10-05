@@ -11,6 +11,14 @@ import { usersRepository, type MyProfile, type UpdateUserInput, type UserTheme }
 
 const PG_UNIQUE_VIOLATION = "23505";
 
+/** La cuenta propietaria de NexPay nunca se suspende, se cierra ni se borra. */
+export async function assertNotOwner(userId: string): Promise<void> {
+  const user = await authRepository.findActiveById(userId);
+  if (user?.is_owner) {
+    throw new AppError(409, "OWNER_PROTECTED", "La cuenta propietaria de NexPay no se puede suspender, cerrar ni borrar");
+  }
+}
+
 export const usersService = {
   /** Edita nombre y/o email del propio usuario. Un email ya usado por otra cuenta responde 409. */
   async updateMe(userId: string, input: { full_name?: string; email?: string }): Promise<MyProfile> {
@@ -89,8 +97,15 @@ export const usersService = {
   getUserById: (id: string) => usersRepository.findById(id),
   getThemeById: (id: string) => usersRepository.getThemeById(id),
   getPreferencesById: (id: string) => usersRepository.getPreferencesById(id),
-  updateUser: (id: string, input: UpdateUserInput) => usersRepository.update(id, input),
-  deleteUser: (id: string) => usersRepository.remove(id),
+  async updateUser(id: string, input: UpdateUserInput) {
+    // La cuenta propietaria (recibe las comisiones) no se puede suspender ni cerrar.
+    if (input.status !== undefined && input.status !== "active") await assertNotOwner(id);
+    return usersRepository.update(id, input);
+  },
+  async deleteUser(id: string) {
+    await assertNotOwner(id);
+    return usersRepository.remove(id);
+  },
   updateTheme: (id: string, theme: UserTheme) => usersRepository.updateTheme(id, theme),
   updatePreferences: (id: string, input: Partial<{ theme: UserTheme; in_app_notifications: boolean; email_notifications: boolean }>) =>
     usersRepository.updatePreferences(id, input),

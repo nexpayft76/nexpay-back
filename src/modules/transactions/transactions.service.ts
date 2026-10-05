@@ -8,6 +8,7 @@ import { usersRepository } from "../users/users.repository";
 import { notificationsService } from "../notifications";
 import { alertsService } from "../alerts/alerts.service";
 import { walletsRepository } from "../wallets/wallets.repository";
+import { BALANCE_EXCHANGE_TYPES, OWN_TRANSACTION_TYPES, type HistoryQuery } from "./transactions.middlewares";
 import { transactionsRepository, type TransactionType } from "./transactions.repository";
 
 /** Monedas locales del corredor. Pagar con una local por una fuerte es BUY; al revés, SELL. */
@@ -110,7 +111,62 @@ async function buildQuote(input: ExchangeRequest): Promise<ExchangeQuote> {
   };
 }
 
+/** Movimiento del historial de la cuenta, como lo ve su dueño. */
+export interface HistoryItem {
+  id: string;
+  type: TransactionType;
+  /** null en las recargas. */
+  from_currency: string | null;
+  to_currency: string;
+  from_amount: string;
+  to_amount: string;
+  exchange_rate: number;
+  fee_amount: string;
+  fee_currency: string | null;
+  fee_percent: number;
+  ars_rate_type: string | null;
+  created_at: string;
+}
+
+export interface HistoryPage {
+  items: HistoryItem[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
 export const transactionsService = {
+  /** Historial de la cuenta del usuario autenticado: recargas, compras, ventas e intercambios. */
+  async listMine(userId: string, query: HistoryQuery): Promise<HistoryPage> {
+    const wallet = await walletsRepository.findByUserId(userId);
+    if (!wallet) throw new AppError(404, "WALLET_NOT_FOUND", "El usuario no tiene una wallet");
+    const { rows, total } = await transactionsRepository.findPageByWallet(wallet.id, {
+      types: !query.type ? [...OWN_TRANSACTION_TYPES] : query.type === "DEPOSIT" ? ["DEPOSIT"] : [...BALANCE_EXCHANGE_TYPES],
+      limit: query.limit,
+      offset: (query.page - 1) * query.limit,
+    });
+    return {
+      items: rows.map((tx) => ({
+        id: tx.id,
+        type: tx.type,
+        from_currency: tx.from_currency,
+        to_currency: tx.to_currency,
+        from_amount: tx.from_amount,
+        to_amount: tx.to_amount,
+        exchange_rate: Number(tx.exchange_rate),
+        fee_amount: tx.fee_amount,
+        fee_currency: tx.fee_currency,
+        fee_percent: Number(tx.fee_percent),
+        ars_rate_type: tx.ars_rate_type,
+        created_at: new Date(tx.created_at).toISOString(),
+      })),
+      page: query.page,
+      limit: query.limit,
+      total,
+    };
+  },
+
+
   listTransactions: () => transactionsRepository.findAll(),
   getTransactionById: (id: string) => transactionsRepository.findById(id),
 

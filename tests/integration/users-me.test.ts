@@ -34,6 +34,8 @@ const dbUser: AuthUserRecord = {
   email: profile.email,
   password_hash: PASSWORD_HASH,
   session_version: 0,
+  role: "user",
+  is_owner: false,
   status: "active",
   created_at: new Date(profile.created_at),
   deleted_at: null,

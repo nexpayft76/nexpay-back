@@ -1,8 +1,8 @@
 import { Router } from "express";
 
-import { exchange, getTransaction, listTransactions, quoteExchange } from "./transactions.controller";
+import { exchange, getTransaction, listMyTransactions, listTransactions, quoteExchange } from "./transactions.controller";
 import { validateExchange, validateTransactionId } from "./transactions.middlewares";
-import { requireAdmin } from "../auth/auth.middlewares";
+import { requireSuperuser } from "../auth/auth.middlewares";
 
 export const transactionsRouter = Router();
 
@@ -40,7 +40,24 @@ export const transactionsRouter = Router();
  *       200:
  *         description: Lista de transacciones
  */
-transactionsRouter.get("/", requireAdmin, listTransactions);
+transactionsRouter.get("/", requireSuperuser, listTransactions);
+
+/**
+ * @openapi
+ * /api/transactions/me:
+ *   get:
+ *     summary: Historial de mi cuenta (recargas e intercambios de balance)
+ *     description: Del más nuevo al más viejo, paginado. Los intercambios P2P están en GET /api/p2p/trades/me.
+ *     tags: [Transactions]
+ *     parameters:
+ *       - { in: query, name: type, schema: { type: string, enum: [DEPOSIT, EXCHANGE] }, description: "EXCHANGE = intercambios de balance (compra, venta e intercambio)" }
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 20, maximum: 50 } }
+ *     responses:
+ *       200:
+ *         description: "{ items, page, limit, total }"
+ */
+transactionsRouter.get("/me", listMyTransactions);
 
 /**
  * @openapi
@@ -145,4 +162,4 @@ transactionsRouter.post("/me/exchange", validateExchange, exchange);
  *         description: Transacción no encontrada
  */
 // Las rutas "/me/..." van antes de "/:id": si no, Express tomaría "me" como un id.
-transactionsRouter.get("/:id", requireAdmin, validateTransactionId, getTransaction);
+transactionsRouter.get("/:id", requireSuperuser, validateTransactionId, getTransaction);

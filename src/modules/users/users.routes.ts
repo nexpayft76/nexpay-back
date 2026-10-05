@@ -23,7 +23,7 @@ import {
   validateUserId,
 } from "./users.middlewares";
 import { rateLimit } from "../../middlewares/rate-limit.middleware";
-import { requireAdmin, requireAuth } from "../auth/auth.middlewares";
+import { requireSuperuser, requireAuth } from "../auth/auth.middlewares";
 
 export const usersRouter = Router();
 
@@ -168,7 +168,7 @@ usersRouter.delete("/me", rateLimit({ windowMs: 60_000, max: 5 }), validateClose
  *       200:
  *         description: Lista de usuarios
  */
-usersRouter.get("/", requireAdmin, listUsers);
+usersRouter.get("/", requireSuperuser, listUsers);
 
 /**
  * @openapi
@@ -189,7 +189,7 @@ usersRouter.get("/", requireAdmin, listUsers);
  *       404:
  *         description: Usuario no encontrado
  */
-usersRouter.get("/:id", requireAdmin, validateUserId, getUser);
+usersRouter.get("/:id", requireSuperuser, validateUserId, getUser);
 
 /**
  * @openapi
@@ -224,7 +224,7 @@ usersRouter.get("/:id", requireAdmin, validateUserId, getUser);
  *       404:
  *         description: Usuario no encontrado
  */
-usersRouter.patch("/:id", requireAdmin, validateUserId, validateUpdateUser, updateUser);
+usersRouter.patch("/:id", requireSuperuser, validateUserId, validateUpdateUser, updateUser);
 
 /**
  * @openapi
@@ -245,4 +245,4 @@ usersRouter.patch("/:id", requireAdmin, validateUserId, validateUpdateUser, upda
  *       404:
  *         description: Usuario no encontrado
  */
-usersRouter.delete("/:id", requireAdmin, validateUserId, deleteUser);
+usersRouter.delete("/:id", requireSuperuser, validateUserId, deleteUser);
