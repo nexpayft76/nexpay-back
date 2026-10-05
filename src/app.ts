@@ -41,6 +41,23 @@ app.use("/api", (_req, res, next) => {
   next();
 });
 
+/**
+ * @openapi
+ * /:
+ *   get:
+ *     summary: Verificar que la API está en ejecución
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Estado de la API
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name: { type: string, example: "NexPay API" }
+ *                 status: { type: string, example: running }
+ */
 app.get("/", (_req, res) => {
   res.json({ name: "NexPay API", status: "running" });
 });
