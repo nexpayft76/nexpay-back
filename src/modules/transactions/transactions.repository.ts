@@ -2,9 +2,10 @@ import type { PoolClient } from "pg";
 
 import { pool, type Queryable } from "../../config/db";
 import { AppError } from "../../utils/app-error";
+import { treasuryRepository } from "../treasury/treasury.repository";
 import { walletsRepository } from "../wallets/wallets.repository";
 
-export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT";
+export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT" | "P2P";
 
 export interface TransactionRecord {
   id: string;
@@ -35,7 +36,7 @@ export interface CreateTransactionInput {
 /** Cambio ya calculado por el servicio (tasa del servidor y comisión). Los montos van como texto exacto. */
 export interface ExchangeInput {
   wallet_id: string;
-  type: Exclude<TransactionType, "DEPOSIT">;
+  type: Exclude<TransactionType, "DEPOSIT" | "P2P">;
   from_currency: string;
   to_currency: string;
   /** Total que se debita del origen, comisión incluida. */
@@ -65,6 +66,30 @@ export const transactionsRepository = {
   async findById(id: string): Promise<TransactionRecord | null> {
     const { rows } = await pool.query<TransactionRecord>("SELECT * FROM transactions WHERE id = $1", [id]);
     return rows[0] ?? null;
+  },
+
+  /**
+   * Historial de una wallet, del más nuevo al más viejo, paginado. Por defecto solo las operaciones
+   * dentro de la propia cuenta (recargas, compras, ventas e intercambios); los P2P tienen su propio historial.
+   */
+  async findPageByWallet(
+    walletId: string,
+    filters: { types: TransactionType[]; limit: number; offset: number },
+  ): Promise<{ rows: TransactionRecord[]; total: number }> {
+    const [list, count] = await Promise.all([
+      pool.query<TransactionRecord>(
+        `SELECT * FROM transactions
+         WHERE wallet_id = $1 AND type = ANY($2::varchar[])
+         ORDER BY created_at DESC
+         LIMIT $3 OFFSET $4`,
+        [walletId, filters.types, filters.limit, filters.offset],
+      ),
+      pool.query<{ total: number }>(
+        "SELECT count(*)::int AS total FROM transactions WHERE wallet_id = $1 AND type = ANY($2::varchar[])",
+        [walletId, filters.types],
+      ),
+    ]);
+    return { rows: list.rows, total: count.rows[0]?.total ?? 0 };
   },
 
   /** Últimos movimientos de una wallet, del más nuevo al más viejo (los usa el asistente, solo lectura). */
@@ -140,6 +165,17 @@ export const transactionsRepository = {
     );
     const transaction = inserted.rows[0];
     if (!transaction) throw new Error("INSERT INTO transactions no devolvió filas");
+
+    // La comisión (en la moneda de origen) va a la billetera de la cuenta propietaria, en la misma transacción.
+    await treasuryRepository.collect(client, [
+      {
+        source: "exchange",
+        currency: input.from_currency,
+        amount: input.fee_amount,
+        payer_wallet_id: input.wallet_id,
+        transaction_id: transaction.id,
+      },
+    ]);
 
     return { transaction, balances: { from: fromBalance.amount, to: toBalance.amount } };
   },

@@ -12,6 +12,5 @@ process.env.DB_SSL = "false";
 process.env.JWT_SECRET = "test-secret-test-secret-test-secret-0123456789";
 process.env.JWT_EXPIRES_IN = "1h";
 process.env.FRONTEND_URL = "http://localhost:5173";
-process.env.ADMIN_EMAILS = "";
 process.env.AWS_ACCESS_KEY_ID = "";
 process.env.AWS_SECRET_ACCESS_KEY = "";
