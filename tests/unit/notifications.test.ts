@@ -5,6 +5,8 @@ import {
   buildAlertEmail,
   buildDepositEmail,
   buildExchangeEmail,
+  buildPasswordChangedEmail,
+  buildPasswordResetEmail,
   buildWelcomeEmail,
 } from "../../src/modules/notifications/notifications.templates";
 import { notificationsRepository } from "../../src/modules/notifications/notifications.repository";
@@ -40,6 +42,31 @@ describe("Notifications Module - AWS SES Emails", () => {
     assert.ok(!email.html.includes("background-color: #0a0a0a"));
   });
 
+  it("buildPasswordChangedEmail informa el cambio sin incluir ninguna contraseña", () => {
+    const email = buildPasswordChangedEmail(dummyUser);
+    const escapedNameEmail = buildPasswordChangedEmail({ ...dummyUser, full_name: "<Carlos>" });
+
+    assert.equal(email.subject, "Se cambió la contraseña de tu cuenta NexPay");
+    assert.ok(email.html.includes("se cambió correctamente"));
+    assert.ok(email.text.includes("se cambió correctamente"));
+    assert.ok(email.html.includes("Si no realizaste este cambio"));
+    assert.ok(email.text.includes("Si no realizaste este cambio"));
+    assert.ok(escapedNameEmail.html.includes("Hola, &lt;Carlos&gt;"));
+  });
+
+  it("buildPasswordResetEmail incluye un enlace de un solo uso y escapa su URL", () => {
+    const email = buildPasswordResetEmail({
+      user: dummyUser,
+      resetUrl: "https://nexpay.example/reset-password?token=abc&next=<unsafe>",
+    });
+
+    assert.ok(email.subject.includes("Restablece tu contraseña"));
+    assert.ok(email.html.includes("https://nexpay.example/reset-password?token=abc&amp;next=&lt;unsafe&gt;"));
+    assert.ok(email.text.includes("https://nexpay.example/reset-password?token=abc&next=<unsafe>"));
+    assert.ok(email.html.includes("vence en una hora"));
+    assert.ok(email.text.includes("solo puede usarse una vez"));
+  });
+
   it("2. buildExchangeEmail genera resumen de transacción (compra/venta) con detalles y aviso ficticio", () => {
     const exchangeData = {
       user: dummyUser,
@@ -57,8 +84,8 @@ describe("Notifications Module - AWS SES Emails", () => {
 
     const email = buildExchangeEmail(exchangeData);
 
-    assert.ok(email.subject.includes("Compra de Divisa"));
-    assert.ok(email.html.includes("Compra de Divisa"));
+    assert.ok(email.subject.includes("Intercambio de balance"));
+    assert.ok(email.html.includes("Intercambio de balance"));
     assert.ok(email.html.includes("100000.00 COP"));
     assert.ok(email.html.includes("+25.00 USD"));
     assert.ok(email.html.includes("tx-12345-abcde"));
@@ -121,6 +148,8 @@ describe("Notifications Module - AWS SES Emails", () => {
 
   it("notificationsService expone los métodos requeridos y no lanza excepciones no controladas", async () => {
     assert.equal(typeof notificationsService.sendWelcomeEmail, "function");
+    assert.equal(typeof notificationsService.sendPasswordChangedEmail, "function");
+    assert.equal(typeof notificationsService.sendPasswordResetEmail, "function");
     assert.equal(typeof notificationsService.sendExchangeEmail, "function");
     assert.equal(typeof notificationsService.sendDepositEmail, "function");
     assert.equal(typeof notificationsService.sendAlertEmail, "function");
@@ -156,6 +185,34 @@ describe("Notifications Module - AWS SES Emails", () => {
         status: "failed",
         provider_message_id: undefined,
         error_message: "AWS_SES_NOT_CONFIGURED",
+      });
+
+      await assert.doesNotReject(async () => {
+        await notificationsService.sendPasswordChangedEmail(dummyUser);
+      });
+      assert.deepEqual(insertedInput, {
+        user_id: dummyUser.id,
+        recipient_email: dummyUser.email,
+        email_type: "password_changed",
+        subject: "Se cambió la contraseña de tu cuenta NexPay",
+      });
+      assert.deepEqual(updatedResult, {
+        status: "failed",
+        provider_message_id: undefined,
+        error_message: "AWS_SES_NOT_CONFIGURED",
+      });
+
+      await assert.doesNotReject(async () => {
+        await notificationsService.sendPasswordResetEmail({
+          user: dummyUser,
+          resetUrl: "https://nexpay.example/reset-password?token=abc",
+        });
+      });
+      assert.deepEqual(insertedInput, {
+        user_id: dummyUser.id,
+        recipient_email: dummyUser.email,
+        email_type: "password_reset",
+        subject: "Restablece tu contraseña de NexPay",
       });
 
       await assert.doesNotReject(async () => {

@@ -2,8 +2,10 @@ import type { PoolClient } from "pg";
 
 import { pool, type Queryable } from "../../config/db";
 import { AppError } from "../../utils/app-error";
+import { treasuryRepository } from "../treasury/treasury.repository";
+import { walletsRepository } from "../wallets/wallets.repository";
 
-export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT";
+export type TransactionType = "BUY" | "SELL" | "EXCHANGE" | "DEPOSIT" | "P2P";
 
 export interface TransactionRecord {
   id: string;
@@ -34,7 +36,7 @@ export interface CreateTransactionInput {
 /** Cambio ya calculado por el servicio (tasa del servidor y comisión). Los montos van como texto exacto. */
 export interface ExchangeInput {
   wallet_id: string;
-  type: Exclude<TransactionType, "DEPOSIT">;
+  type: Exclude<TransactionType, "DEPOSIT" | "P2P">;
   from_currency: string;
   to_currency: string;
   /** Total que se debita del origen, comisión incluida. */
@@ -67,11 +69,48 @@ export const transactionsRepository = {
   },
 
   /**
+   * Historial de una wallet, del más nuevo al más viejo, paginado. Por defecto solo las operaciones
+   * dentro de la propia cuenta (recargas, compras, ventas e intercambios); los P2P tienen su propio historial.
+   */
+  async findPageByWallet(
+    walletId: string,
+    filters: { types: TransactionType[]; limit: number; offset: number },
+  ): Promise<{ rows: TransactionRecord[]; total: number }> {
+    const [list, count] = await Promise.all([
+      pool.query<TransactionRecord>(
+        `SELECT * FROM transactions
+         WHERE wallet_id = $1 AND type = ANY($2::varchar[])
+         ORDER BY created_at DESC
+         LIMIT $3 OFFSET $4`,
+        [walletId, filters.types, filters.limit, filters.offset],
+      ),
+      pool.query<{ total: number }>(
+        "SELECT count(*)::int AS total FROM transactions WHERE wallet_id = $1 AND type = ANY($2::varchar[])",
+        [walletId, filters.types],
+      ),
+    ]);
+    return { rows: list.rows, total: count.rows[0]?.total ?? 0 };
+  },
+
+  /** Últimos movimientos de una wallet, del más nuevo al más viejo (los usa el asistente, solo lectura). */
+  async findRecentByWallet(walletId: string, limit = 10): Promise<TransactionRecord[]> {
+    const { rows } = await pool.query<TransactionRecord>(
+      "SELECT * FROM transactions WHERE wallet_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [walletId, limit],
+    );
+    return rows;
+  },
+
+  /**
    * Aplica un cambio de moneda dentro de la transacción SQL de `client` (base: trabajo de Nelson):
    * bloquea los dos saldos, debita el origen solo si alcanza, acredita el destino y lo registra.
    * Si algo falla, withTransaction hace ROLLBACK y no queda nada a medias.
    */
   async applyExchange(client: PoolClient, input: ExchangeInput): Promise<ExchangeRecord> {
+    if (!(await walletsRepository.lockActiveUserForWallet(client, input.wallet_id))) {
+      throw new AppError(401, "UNAUTHORIZED", "El usuario ya no está activo");
+    }
+
     // FOR UPDATE: dos operaciones simultáneas sobre la misma wallet esperan su turno (sin saldo negativo).
     // ORDER BY fijo: siempre se bloquean en el mismo orden, así dos cambios cruzados no se trancan.
     await client.query(
@@ -126,6 +165,17 @@ export const transactionsRepository = {
     );
     const transaction = inserted.rows[0];
     if (!transaction) throw new Error("INSERT INTO transactions no devolvió filas");
+
+    // La comisión (en la moneda de origen) va a la billetera de la cuenta propietaria, en la misma transacción.
+    await treasuryRepository.collect(client, [
+      {
+        source: "exchange",
+        currency: input.from_currency,
+        amount: input.fee_amount,
+        payer_wallet_id: input.wallet_id,
+        transaction_id: transaction.id,
+      },
+    ]);
 
     return { transaction, balances: { from: fromBalance.amount, to: toBalance.amount } };
   },

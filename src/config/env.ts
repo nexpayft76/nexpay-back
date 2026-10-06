@@ -26,17 +26,33 @@ const envSchema = z.object({
   HISTORY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(21600),
   // Recargas con dinero ficticio (modo demo). Poner en "false" si algún día se maneja dinero real.
   DEMO_DEPOSITS_ENABLED: z.enum(["true", "false"]).default("true"),
-  // Comisión por compra/venta/intercambio, en % del monto de origen (1 = 1%).
-  // 0 para la Demo 1 (sin comisión); se activa en la demo final (ej. 1).
-  EXCHANGE_FEE_PERCENT: z.coerce.number().min(0).max(10).default(0),
-  // Emails (separados por coma) que pueden usar el CRUD de administración: listar usuarios, billeteras,
-  // saldos y transacciones de todos, editar usuarios y el catálogo de monedas. Vacío = nadie.
-  ADMIN_EMAILS: z.string().default(""),
+  // Comisión del intercambio de balance (cambiar una moneda por otra dentro de la propia cuenta),
+  // en % del monto de origen: 0.05 = 0,05%.
+  EXCHANGE_FEE_PERCENT: z.coerce.number().min(0).max(10).default(0.05),
+  // P2P: comisión que paga cada parte, en % de lo que recibe (0.5 = 0,5%).
+  P2P_FEE_PERCENT: z.coerce.number().min(0).max(10).default(0.5),
+  // P2P: cuánto puede alejarse la tasa del vendedor de la del mercado, en % (10 = ±10%).
+  P2P_MAX_RATE_DEVIATION_PERCENT: z.coerce.number().min(1).max(50).default(10),
+  // P2P: horas que dura una oferta abierta; al vencer, el dinero retenido vuelve al vendedor.
+  P2P_OFFER_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(72),
+  // P2P: máximo de ofertas abiertas por usuario a la vez.
+  P2P_MAX_OPEN_OFFERS: z.coerce.number().int().min(1).max(50).default(5),
   // AWS SES para envío de notificaciones por email
   AWS_REGION: z.string().default("us-east-2"),
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   SES_FROM_EMAIL: z.string().email().default("nexpay.team@gmail.com"),
+  // Asistente con IA (OpenRouter). Sin key, el asistente responde "no disponible" y el resto de la API sigue igual.
+  OPENROUTER_API_KEY: z.string().optional(),
+  // Modelos a usar, en orden de preferencia y separados por coma. Si uno se queda sin cupo o falla,
+  // se pasa al siguiente. Por defecto, modelos gratis (terminan en ":free"); la lista cambia seguido:
+  // ver https://openrouter.ai/models (filtro "FREE").
+  OPENROUTER_MODELS: z
+    .string()
+    .default(
+      "qwen/qwen3.8-27b:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-super-120b-a12b:free,google/gemma-4-26b-a4b-it:free",
+    ),
+  OPENROUTER_BASE_URL: z.url().default("https://openrouter.ai/api/v1"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -62,14 +78,12 @@ function durationToSeconds(value: string): number {
 export const env = {
   ...data,
   frontendAppUrl: data.FRONTEND_APP_URL,
+  openRouterModels: data.OPENROUTER_MODELS.split(",")
+    .map((model) => model.trim())
+    .filter(Boolean),
   jwtExpiresInSeconds: durationToSeconds(data.JWT_EXPIRES_IN),
   isProduction: data.NODE_ENV === "production",
   demoDepositsEnabled: data.DEMO_DEPOSITS_ENABLED === "true",
-  adminEmails: new Set(
-    data.ADMIN_EMAILS.split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  ),
   // SSL explícito si se define DB_SSL; si no, activo solo en producción.
   dbSsl: data.DB_SSL ? data.DB_SSL === "true" : data.NODE_ENV === "production",
   // Varios orígenes separados por coma; admite "*" para previews (ver src/config/cors.ts).

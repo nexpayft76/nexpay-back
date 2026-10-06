@@ -8,14 +8,18 @@ import { requestLogger } from "./middlewares/request-logger.middleware";
 import { securityHeaders } from "./middlewares/security-headers.middleware";
 import {
   alertsRouter,
+  assistantPublicRouter,
+  assistantRouter,
   balancesRouter,
   currenciesRouter,
   notificationsRouter,
+  p2pRouter,
+  superuserRouter,
   transactionsRouter,
   usersRouter,
   walletsRouter,
 } from "./modules";
-import { requireAuth } from "./modules/auth/auth.middlewares";
+import { requireAuth, requireSuperuser } from "./modules/auth/auth.middlewares";
 import { authRouter } from "./modules/auth/auth.routes";
 import { ratesRouter } from "./modules/rates/rates.routes";
 import { healthRouter } from "./routes/health.routes";
@@ -56,6 +60,12 @@ app.use("/api/currencies", requireAuth, currenciesRouter);
 app.use("/api/transactions", requireAuth, transactionsRouter);
 app.use("/api/alerts", requireAuth, alertsRouter);
 app.use("/api/notifications", requireAuth, notificationsRouter);
+app.use("/api/p2p", requireAuth, p2pRouter);
+app.use("/api/superuser", requireAuth, requireSuperuser, superuserRouter);
+// Asistente con IA. Primero lo público (chat de la landing y estado de los modelos, sin datos de nadie);
+// el resto exige sesión (usa los datos del usuario, siempre en modo lectura).
+app.use("/api/assistant", assistantPublicRouter);
+app.use("/api/assistant", requireAuth, assistantRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

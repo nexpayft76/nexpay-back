@@ -20,6 +20,11 @@ export function matchesDirection(direction: "up" | "down", value: number, thresh
   return direction === "up" ? value >= threshold : value <= threshold;
 }
 
+export function formatAlertNumber(value: number | string): string {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(2) : String(value);
+}
+
 async function assertCurrencies(codes: string[]): Promise<void> {
   const supported = new Set((await currenciesRepository.findAll()).map(({ code }) => code));
   const unsupported = codes.find((code) => !supported.has(code));
@@ -40,7 +45,7 @@ async function evaluateBalanceRules(userId: string, balances: BalanceChange[], e
           rule,
           `${eventKey}:${balance.currency}:low`,
           `Saldo bajo en ${balance.currency}`,
-          `Tu saldo quedó en ${balance.amount} ${balance.currency}.`,
+          `Tu saldo quedó en ${formatAlertNumber(balance.amount)} ${balance.currency}.`,
         );
       }
     }
@@ -88,19 +93,19 @@ function rateEmail(rule: AlertRule): { title: string; message: string } {
   if (rule.kind === "stale_rates") {
     return {
       title: `Tasas desactualizadas para ${rule.currency}`,
-      message: `La fuente de tasas lleva más de ${rule.threshold} minutos sin publicar datos nuevos.`,
+      message: `La fuente de tasas lleva más de ${formatAlertNumber(rule.threshold)} minutos sin publicar datos nuevos.`,
     };
   }
   if (rule.kind === "daily_change") {
     const movement = rule.direction === "up" ? "subió más" : "bajó más";
     return {
       title: `Variación diaria de ${rule.currency}`,
-      message: `${rule.currency} ${movement} del ${rule.threshold}% frente a ${rule.base_currency}.`,
+      message: `${rule.currency} ${movement} del ${formatAlertNumber(rule.threshold)}% frente a ${rule.base_currency}.`,
     };
   }
   return {
     title: `Se cumplió tu tasa objetivo para ${rule.currency}`,
-    message: `1 ${rule.base_currency} ${rule.direction === "up" ? "superó" : "bajó de"} ${rule.threshold} ${rule.currency}.`,
+    message: `1 ${rule.base_currency} ${rule.direction === "up" ? "superó" : "bajó de"} ${formatAlertNumber(rule.threshold)} ${rule.currency}.`,
   };
 }
 
@@ -138,7 +143,7 @@ export const alertsService = {
           rule,
           `${event.transactionId}:deposit`,
           `Recarga recibida en ${event.currency}`,
-          `Sumaste ${event.amount} ${event.currency} a tu wallet.`,
+          `Sumaste ${formatAlertNumber(event.amount)} ${event.currency} a tu wallet.`,
         );
       }
       await evaluateBalanceRules(userId, [{ currency: event.currency, amount: event.newBalance }], event.transactionId);

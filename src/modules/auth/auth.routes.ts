@@ -1,8 +1,24 @@
 import { Router } from "express";
 
 import { rateLimit } from "../../middlewares/rate-limit.middleware";
-import { emailAvailable, login, logout, me, register, session } from "./auth.controller";
-import { optionalAuth, requireAuth, validateLogin, validateRegister } from "./auth.middlewares";
+import {
+  emailAvailable,
+  login,
+  logout,
+  me,
+  register,
+  requestPasswordReset,
+  resetPassword,
+  session,
+} from "./auth.controller";
+import {
+  optionalAuth,
+  requireAuth,
+  validateLogin,
+  validatePasswordReset,
+  validatePasswordResetRequest,
+  validateRegister,
+} from "./auth.middlewares";
 
 export const authRouter = Router();
 
@@ -155,6 +171,71 @@ authRouter.get("/email-available", rateLimit({ windowMs: 60_000, max: 20 }), ema
  */
 // Límite por IP contra la prueba masiva de contraseñas (fuerza bruta).
 authRouter.post("/login", rateLimit({ windowMs: 60_000, max: 10 }), validateLogin, login);
+
+/**
+ * @openapi
+ * /api/auth/password-reset/request:
+ *   post:
+ *     summary: Solicita por email un enlace para restablecer la contraseña
+ *     description: Siempre responde con el mismo mensaje para no revelar si el email está registrado. Máximo 5 solicitudes cada 15 minutos por IP.
+ *     security: []
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email, example: "ana@nexpay.com" }
+ *     responses:
+ *       200:
+ *         description: Solicitud recibida
+ *       400:
+ *         description: Email inválido
+ *       429:
+ *         description: Demasiadas solicitudes desde la misma IP
+ */
+authRouter.post(
+  "/password-reset/request",
+  rateLimit({ windowMs: 15 * 60_000, max: 5 }),
+  validatePasswordResetRequest,
+  requestPasswordReset,
+);
+
+/**
+ * @openapi
+ * /api/auth/password-reset/confirm:
+ *   post:
+ *     summary: Cambia la contraseña usando un enlace vigente de un solo uso
+ *     description: Invalida todas las sesiones existentes al actualizar la contraseña.
+ *     security: []
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, new_password]
+ *             properties:
+ *               token: { type: string, description: "Token recibido por email" }
+ *               new_password: { type: string, minLength: 8, maxLength: 72, description: "Al menos una letra y un número" }
+ *     responses:
+ *       200:
+ *         description: Contraseña actualizada
+ *       400:
+ *         description: Datos inválidos o token vencido/usado
+ *       429:
+ *         description: Demasiadas solicitudes desde la misma IP
+ */
+authRouter.post(
+  "/password-reset/confirm",
+  rateLimit({ windowMs: 60_000, max: 10 }),
+  validatePasswordReset,
+  resetPassword,
+);
 
 /**
  * @openapi

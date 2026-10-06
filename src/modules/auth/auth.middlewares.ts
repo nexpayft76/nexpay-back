@@ -43,6 +43,12 @@ const loginSchema = z.object({
   password: z.string({ error: "La contraseña es obligatoria" }).min(1, "La contraseña es obligatoria"),
 });
 
+const passwordResetRequestSchema = z.object({ email: emailSchema });
+const passwordResetSchema = z.object({
+  token: z.string().regex(/^[a-f\d]{64}$/i, "El enlace de restablecimiento no es válido"),
+  new_password: newPasswordSchema,
+});
+
 /** Valida el body con zod. Si falla, responde 400 con el mismo formato que el resto de módulos. */
 export function validateBody(schema: z.ZodType, errorCode: string, message: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -81,6 +87,16 @@ export function parseEmailQuery(query: unknown): string {
 
 export const validateRegister = validateBody(registerSchema, "INVALID_REGISTER_PAYLOAD", "Datos de registro inválidos");
 export const validateLogin = validateBody(loginSchema, "INVALID_LOGIN_PAYLOAD", "Datos de inicio de sesión inválidos");
+export const validatePasswordResetRequest = validateBody(
+  passwordResetRequestSchema,
+  "INVALID_PASSWORD_RESET_REQUEST",
+  "Email inválido",
+);
+export const validatePasswordReset = validateBody(
+  passwordResetSchema,
+  "INVALID_PASSWORD_RESET",
+  "Datos de restablecimiento inválidos",
+);
 
 // ---------- Protección de rutas ----------
 
@@ -101,7 +117,7 @@ function readToken(req: Request): { token: string; fromCookie: boolean } | null 
   return cookie ? { token: cookie, fromCookie: true } : null;
 }
 
-/** Verifica firma, vencimiento, que no esté revocado y que el usuario siga activo. Si no, 401. */
+/** Verifica firma, vencimiento, revocación, versión de sesión y estado activo. Si falla, responde 401. */
 export async function authenticate(token: string): Promise<{ auth: AuthContext; user: AuthUserRecord }> {
   let payload: jwt.JwtPayload;
   try {
@@ -113,11 +129,14 @@ export async function authenticate(token: string): Promise<{ auth: AuthContext; 
   }
 
   const { sub, jti, exp } = payload;
-  if (!sub || !jti || !exp) throw unauthorized("Sesión inválida");
+  const sessionVersion = payload.sv ?? 0;
+  if (!sub || !jti || !exp || !Number.isInteger(sessionVersion)) throw unauthorized("Sesión inválida");
   if (isTokenRevoked(jti)) throw unauthorized("La sesión fue cerrada");
 
   const user = await authRepository.findActiveById(sub);
-  if (!user || user.status !== "active") throw unauthorized("El usuario no existe o no está activo");
+  if (!user || user.status !== "active" || user.session_version !== sessionVersion) {
+    throw unauthorized("El usuario no existe o la sesión ya no es válida");
+  }
 
   return { auth: { userId: sub, jti, exp }, user };
 }
@@ -168,14 +187,14 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
 }
 
 /**
- * Solo administradores (email en ADMIN_EMAILS). Va después de `requireAuth`.
- * Protege el CRUD que ve o modifica datos de TODOS los usuarios: un usuario común solo usa las rutas /me.
+ * Solo superusuarios: ven y gestionan a todos los usuarios y todo el sistema. Va después de `requireAuth`.
+ * El rol se lee de la base en cada petición (no del token): si le quitan el rol, deja de entrar al instante.
  */
-export async function requireAdmin(req: Request, _res: Response, next: NextFunction): Promise<void> {
+export async function requireSuperuser(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const auth = getAuth(req);
   const user = await authRepository.findActiveById(auth.userId);
-  if (!user || !env.adminEmails.has(user.email.toLowerCase())) {
-    throw new AppError(403, "FORBIDDEN", "Esta operación es solo para administradores");
+  if (!user || user.role !== "superuser") {
+    throw new AppError(403, "FORBIDDEN", "Esta operación es solo para el superusuario");
   }
   next();
 }

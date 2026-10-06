@@ -1,5 +1,5 @@
 import { pool, type Queryable } from "../../config/db";
-import type { UserStatus } from "./auth.types";
+import type { UserRole, UserStatus } from "./auth.types";
 
 export interface AuthUserRecord {
   id: string;
@@ -7,12 +7,15 @@ export interface AuthUserRecord {
   email: string;
   /** null en cuentas creadas con Google (sin contraseña). */
   password_hash: string | null;
+  session_version: number;
   status: UserStatus;
+  role: UserRole;
+  is_owner: boolean;
   created_at: Date;
   deleted_at: Date | null;
 }
 
-const COLUMNS = "id, full_name, email, password_hash, status, created_at, deleted_at";
+const COLUMNS = "id, full_name, email, password_hash, session_version, status, role, is_owner, created_at, deleted_at";
 
 export const authRepository = {
   async findByEmail(email: string, db: Queryable = pool): Promise<AuthUserRecord | null> {

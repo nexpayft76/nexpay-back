@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { DatabaseError } from "pg";
 
 import { AppError } from "../../utils/app-error";
+import { notificationsService } from "../notifications";
 import { BCRYPT_ROUNDS } from "../auth/auth.service";
 import { authRepository } from "../auth/auth.repository";
 import { revokeToken } from "../auth/auth.token-blacklist";
@@ -9,6 +10,14 @@ import type { AuthContext } from "../auth/auth.types";
 import { usersRepository, type MyProfile, type UpdateUserInput, type UserTheme } from "./users.repository";
 
 const PG_UNIQUE_VIOLATION = "23505";
+
+/** La cuenta propietaria de NexPay nunca se suspende, se cierra ni se borra. */
+export async function assertNotOwner(userId: string): Promise<void> {
+  const user = await authRepository.findActiveById(userId);
+  if (user?.is_owner) {
+    throw new AppError(409, "OWNER_PROTECTED", "La cuenta propietaria de NexPay no se puede suspender, cerrar ni borrar");
+  }
+}
 
 export const usersService = {
   /** Edita nombre y/o email del propio usuario. Un email ya usado por otra cuenta responde 409. */
@@ -32,12 +41,12 @@ export const usersService = {
    * y revoca el token actual. La contraseña incorrecta responde 403 y NO 401: el front trata cualquier
    * 401 como "sesión vencida" y cerraría la sesión de alguien que solo se equivocó al escribirla.
    */
-  async closeMyAccount(auth: AuthContext, password: string): Promise<void> {
+  async closeMyAccount(auth: AuthContext, password?: string): Promise<void> {
     const user = await authRepository.findActiveById(auth.userId);
     if (!user) throw new AppError(401, "UNAUTHORIZED", "El usuario ya no existe");
 
     // Las cuentas sin contraseña (creadas con Google) no tienen con qué confirmar: se omite el control.
-    if (user.password_hash && !(await bcrypt.compare(password, user.password_hash))) {
+    if (user.password_hash && (!password || !(await bcrypt.compare(password, user.password_hash)))) {
       throw new AppError(403, "INVALID_PASSWORD", "La contraseña es incorrecta");
     }
 
@@ -77,14 +86,26 @@ export const usersService = {
     if (!(await usersRepository.updatePasswordHash(userId, passwordHash))) {
       throw new AppError(401, "UNAUTHORIZED", "El usuario ya no existe");
     }
+    void notificationsService.sendPasswordChangedEmail({
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+    });
   },
 
   listUsers: () => usersRepository.findAll(),
   getUserById: (id: string) => usersRepository.findById(id),
   getThemeById: (id: string) => usersRepository.getThemeById(id),
   getPreferencesById: (id: string) => usersRepository.getPreferencesById(id),
-  updateUser: (id: string, input: UpdateUserInput) => usersRepository.update(id, input),
-  deleteUser: (id: string) => usersRepository.remove(id),
+  async updateUser(id: string, input: UpdateUserInput) {
+    // La cuenta propietaria (recibe las comisiones) no se puede suspender ni cerrar.
+    if (input.status !== undefined && input.status !== "active") await assertNotOwner(id);
+    return usersRepository.update(id, input);
+  },
+  async deleteUser(id: string) {
+    await assertNotOwner(id);
+    return usersRepository.remove(id);
+  },
   updateTheme: (id: string, theme: UserTheme) => usersRepository.updateTheme(id, theme),
   updatePreferences: (id: string, input: Partial<{ theme: UserTheme; in_app_notifications: boolean; email_notifications: boolean }>) =>
     usersRepository.updatePreferences(id, input),

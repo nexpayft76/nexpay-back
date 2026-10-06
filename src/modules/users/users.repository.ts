@@ -1,4 +1,4 @@
-import { pool } from "../../config/db";
+import { pool, withTransaction } from "../../config/db";
 
 export interface UserRecord {
   id: string;
@@ -176,38 +176,54 @@ export const usersRepository = {
     return rows[0] ?? null;
   },
 
-  /**
-   * Cierra la cuenta (borrado lógico) solo si todos sus saldos están en 0. Es una única sentencia,
-   * así que no hay carrera entre "revisar el saldo" y "cerrar": si entra dinero justo antes, no cierra.
-   */
+  /** Cierra la cuenta solo con saldos en 0; escritores de saldo toman primero el mismo bloqueo de usuario. */
   async close(id: string): Promise<CloseAccountResult> {
-    const { rowCount } = await pool.query(
-      `UPDATE users
-       SET deleted_at = NOW(), status = 'closed', updated_at = NOW()
-       WHERE id = $1 AND deleted_at IS NULL
-         AND NOT EXISTS (
-           SELECT 1 FROM wallets w
-           JOIN balances b ON b.wallet_id = w.id
-           WHERE w.user_id = users.id AND b.amount > 0
-         )`,
-      [id],
-    );
-    if ((rowCount ?? 0) > 0) return "closed";
+    return withTransaction(async (client) => {
+      const { rowCount } = await client.query(
+        `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE`,
+        [id],
+      );
+      if ((rowCount ?? 0) === 0) return "not_found";
 
-    const { rowCount: stillActive } = await pool.query(
-      `SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL`,
-      [id],
-    );
-    return (stillActive ?? 0) > 0 ? "has_balance" : "not_found";
+      const balance = await client.query(
+        `SELECT 1 FROM wallets w
+         JOIN balances b ON b.wallet_id = w.id
+         WHERE w.user_id = $1 AND b.amount > 0
+         LIMIT 1`,
+        [id],
+      );
+      if ((balance.rowCount ?? 0) > 0) return "has_balance";
+
+      await client.query(
+        `UPDATE users SET deleted_at = NOW(), status = 'closed', updated_at = NOW()
+         WHERE id = $1 AND deleted_at IS NULL`,
+        [id],
+      );
+      return "closed";
+    });
   },
 
   /** Guarda el nuevo hash de la contraseña. Devuelve false si el usuario ya no existe. */
   async updatePasswordHash(id: string, passwordHash: string): Promise<boolean> {
-    const { rowCount } = await pool.query(
-      `UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
-      [id, passwordHash],
-    );
-    return (rowCount ?? 0) > 0;
+    return withTransaction(async (client) => {
+      const { rowCount } = await client.query(
+        `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE`,
+        [id],
+      );
+      if ((rowCount ?? 0) === 0) return false;
+
+      await client.query(
+        `UPDATE users SET password_hash = $2, updated_at = NOW()
+         WHERE id = $1 AND deleted_at IS NULL`,
+        [id, passwordHash],
+      );
+      await client.query(
+        `UPDATE password_reset_tokens SET used_at = NOW()
+         WHERE user_id = $1 AND used_at IS NULL`,
+        [id],
+      );
+      return true;
+    });
   },
 
   async remove(id: string): Promise<boolean> {

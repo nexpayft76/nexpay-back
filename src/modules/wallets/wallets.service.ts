@@ -11,7 +11,7 @@ import { alertsService } from "../alerts/alerts.service";
 import { walletsRepository } from "./wallets.repository";
 
 /** Máximo por recarga ficticia, en la moneda recargada (evita saldos absurdos en la demo). */
-const DEPOSIT_LIMITS: Record<string, number> = { COP: 50_000_000, ARS: 20_000_000, USD: 10_000, EUR: 10_000 };
+export const DEPOSIT_LIMITS: Record<string, number> = { COP: 50_000_000, ARS: 20_000_000, USD: 10_000, EUR: 10_000 };
 const DEFAULT_DEPOSIT_LIMIT = 10_000;
 
 export interface DepositInput {
@@ -174,6 +174,9 @@ export const walletsService = {
     const amount = input.amount.toFixed(currency.decimals);
 
     const result = await withTransaction(async (client) => {
+      if (!(await walletsRepository.lockActiveUserForWallet(client, wallet.id))) {
+        throw new AppError(401, "UNAUTHORIZED", "El usuario ya no está activo");
+      }
       const newBalance = await walletsRepository.creditBalance(client, wallet.id, currency.code, amount);
       const tx = await transactionsRepository.insertDeposit(client, {
         wallet_id: wallet.id,

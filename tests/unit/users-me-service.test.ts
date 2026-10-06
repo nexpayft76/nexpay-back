@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import bcrypt from "bcryptjs";
 import { DatabaseError } from "pg";
 import { authRepository, type AuthUserRecord } from "../../src/modules/auth/auth.repository";
+import { notificationsService } from "../../src/modules/notifications";
 import { isTokenRevoked } from "../../src/modules/auth/auth.token-blacklist";
 import { usersRepository, type MyProfile } from "../../src/modules/users/users.repository";
 import { usersService } from "../../src/modules/users/users.service";
@@ -26,6 +27,9 @@ function authUser(overrides: Partial<AuthUserRecord> = {}): AuthUserRecord {
     full_name: profile.full_name,
     email: profile.email,
     password_hash: PASSWORD_HASH,
+    session_version: 0,
+    role: "user",
+    is_owner: false,
     status: "active",
     created_at: new Date(profile.created_at),
     deleted_at: null,
@@ -148,7 +152,7 @@ describe("usersService.closeMyAccount", () => {
     const close = mock.method(usersRepository, "close", async () => "closed" as const);
     const auth = newAuth();
 
-    await usersService.closeMyAccount(auth, "lo-que-sea");
+    await usersService.closeMyAccount(auth);
 
     assert.equal(close.mock.callCount(), 1);
     assert.equal(isTokenRevoked(auth.jti), true);
@@ -165,6 +169,7 @@ describe("usersService.changeMyPassword", () => {
 
   it("guarda un hash bcrypt de la nueva contraseña (nunca el texto plano)", async () => {
     const save = mock.method(usersRepository, "updatePasswordHash", async () => true);
+    const sendPasswordChangedEmail = mock.method(notificationsService, "sendPasswordChangedEmail", async () => {});
 
     await usersService.changeMyPassword(profile.id, PASSWORD, NEW_PASSWORD);
 
@@ -172,6 +177,11 @@ describe("usersService.changeMyPassword", () => {
     assert.equal(id, profile.id);
     assert.notEqual(hash, NEW_PASSWORD);
     assert.equal(await bcrypt.compare(NEW_PASSWORD, hash), true);
+    assert.deepEqual(sendPasswordChangedEmail.mock.calls[0].arguments, [{
+      id: profile.id,
+      email: profile.email,
+      full_name: profile.full_name,
+    }]);
   });
 
   it("con la contraseña actual incorrecta responde 403 INVALID_PASSWORD y no guarda", async () => {
@@ -193,8 +203,10 @@ describe("usersService.changeMyPassword", () => {
   });
 
   it("responde 401 si el usuario no existe o desaparece al guardar", async () => {
+    const sendPasswordChangedEmail = mock.method(notificationsService, "sendPasswordChangedEmail", async () => {});
     mock.method(usersRepository, "updatePasswordHash", async () => false);
     await assertAppError(usersService.changeMyPassword(profile.id, PASSWORD, NEW_PASSWORD), 401, "UNAUTHORIZED");
+    assert.equal(sendPasswordChangedEmail.mock.callCount(), 0);
 
     mock.restoreAll();
     mock.method(authRepository, "findActiveById", async () => null);

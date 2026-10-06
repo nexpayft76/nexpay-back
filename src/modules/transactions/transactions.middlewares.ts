@@ -6,7 +6,7 @@ import { AppError } from "../../utils/app-error";
 const uuidRegex = /^[0-9a-fA-F-]{36}$/;
 const currencyCodeRegex = /^[A-Z0-9]{3,10}$/i;
 
-const transactionTypeSchema = z.enum(["BUY", "SELL", "EXCHANGE", "DEPOSIT"]);
+const transactionTypeSchema = z.enum(["BUY", "SELL", "EXCHANGE", "DEPOSIT", "P2P"]);
 
 const currencyField = (label: string) =>
   z
@@ -58,6 +58,38 @@ export function validateExchange(req: Request, _res: Response, next: NextFunctio
 /** Valida `?from_currency&to_currency&amount&ars_rate` (Express 5: req.query es de solo lectura). */
 export function parseExchangeQuery(query: unknown): ExchangeBody {
   return parseExchange(query);
+}
+
+/** Tipos que se ven en el historial de la cuenta (los P2P tienen su propio historial). */
+export const OWN_TRANSACTION_TYPES = ["DEPOSIT", "BUY", "SELL", "EXCHANGE"] as const;
+
+/** Página de un historial: ?page=1&limit=20 (máximo 50 por página). */
+export const pageSchema = z.object({
+  page: z.coerce.number({ error: "page debe ser un número" }).int().min(1, "page debe ser 1 o más").default(1),
+  limit: z.coerce.number({ error: "limit debe ser un número" }).int().min(1).max(50, "limit admite como máximo 50").default(20),
+});
+
+/** Filtro del historial: recargas o intercambios de balance (EXCHANGE agrupa BUY, SELL y EXCHANGE). */
+export const BALANCE_EXCHANGE_TYPES = ["BUY", "SELL", "EXCHANGE"] as const;
+
+const historySchema = pageSchema
+  .extend({ type: z.enum(["DEPOSIT", "EXCHANGE"], { error: "type debe ser DEPOSIT o EXCHANGE" }).optional() })
+  .strict();
+
+export type HistoryQuery = z.output<typeof historySchema>;
+
+/** Valida `?type&page&limit` de GET /api/transactions/me. */
+export function parseHistoryQuery(query: unknown): HistoryQuery {
+  const result = historySchema.safeParse(query);
+  if (!result.success) {
+    throw new AppError(
+      400,
+      "INVALID_HISTORY_QUERY",
+      "Filtros del historial inválidos",
+      result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+    );
+  }
+  return result.data;
 }
 
 const createTransactionSchema = z.object({

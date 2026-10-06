@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { DatabaseError } from "pg";
@@ -7,6 +7,7 @@ import { env } from "../../config/env";
 import { AppError } from "../../utils/app-error";
 import { notificationsService } from "../notifications";
 import { authRepository, type AuthUserRecord } from "./auth.repository";
+import { passwordResetRepository } from "./password-reset.repository";
 import { revokeToken } from "./auth.token-blacklist";
 import type { AuthContext, AuthResult, PublicUser } from "./auth.types";
 
@@ -33,12 +34,14 @@ export function toPublicUser(user: AuthUserRecord): PublicUser {
     full_name: user.full_name,
     email: user.email,
     status: user.status,
+    role: user.role,
+    is_owner: user.is_owner,
     created_at: user.created_at.toISOString(),
   };
 }
 
 function issueToken(user: AuthUserRecord): AuthResult {
-  const token = jwt.sign({}, env.JWT_SECRET, {
+  const token = jwt.sign({ sv: user.session_version }, env.JWT_SECRET, {
     subject: user.id,
     jwtid: randomUUID(),
     expiresIn: env.jwtExpiresInSeconds,
@@ -100,6 +103,36 @@ export const authService = {
       throw new AppError(403, "ACCOUNT_DISABLED", "La cuenta está suspendida o cerrada");
     }
     return issueToken(user);
+  },
+
+  async requestPasswordReset(email: string): Promise<void> {
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const user = await authRepository.findByEmail(email);
+    if (!user || user.deleted_at !== null || user.status !== "active" || !user.password_hash) return;
+
+    const created = await passwordResetRepository.create(user.id, tokenHash, new Date(Date.now() + 60 * 60 * 1000));
+    if (!created) return;
+    const resetUrl = new URL("/reset-password", env.frontendAppUrl);
+    resetUrl.hash = new URLSearchParams({ token }).toString();
+    void notificationsService.sendPasswordResetEmail({
+      user: { id: user.id, email: user.email, full_name: user.full_name },
+      resetUrl: resetUrl.toString(),
+    });
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    if (!(await passwordResetRepository.isValid(tokenHash))) {
+      throw new AppError(400, "INVALID_OR_EXPIRED_RESET_TOKEN", "El enlace no es válido o ya venció");
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    const user = await passwordResetRepository.consumeAndUpdatePassword(tokenHash, passwordHash);
+    if (!user) {
+      throw new AppError(400, "INVALID_OR_EXPIRED_RESET_TOKEN", "El enlace no es válido o ya venció");
+    }
+    void notificationsService.sendPasswordChangedEmail(user);
   },
 
   logout(auth: AuthContext): void {

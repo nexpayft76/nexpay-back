@@ -3,6 +3,8 @@ import type {
   DepositNotificationData,
   ExchangeNotificationData,
   NotificationRecipient,
+  P2PEmailData,
+  P2PEmailEvent,
 } from "./notifications.types";
 
 const LIGHT_EMAIL_COLORS: Record<string, string> = {
@@ -162,6 +164,86 @@ Recuerda que en NexPay todas las operaciones y saldos son 100% ficticios en modo
   };
 }
 
+export function buildPasswordChangedEmail(user: NotificationRecipient): { subject: string; html: string; text: string } {
+  const subject = "Se cambió la contraseña de tu cuenta NexPay";
+  const firstName = user.full_name.split(" ")[0] || user.full_name;
+  const escapedFirstName = firstName.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+  const contentHtml = `
+    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #eee2c0;">
+      Hola, ${escapedFirstName}
+    </h1>
+    <p style="margin: 0 0 18px; font-size: 15px; line-height: 1.6; color: #b3a888;">
+      Te avisamos que la contraseña de tu cuenta NexPay se cambió correctamente.
+    </p>
+    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #b3a888;">
+      Si no realizaste este cambio, protege tu cuenta y comunícate con el equipo de soporte.
+    </p>
+  `;
+
+  return {
+    subject,
+    html: emailLayout(subject, contentHtml, user.theme),
+    text: `Hola, ${firstName}
+
+Te avisamos que la contraseña de tu cuenta NexPay se cambió correctamente.
+
+Si no realizaste este cambio, protege tu cuenta y comunícate con el equipo de soporte.
+
+© ${new Date().getFullYear()} NexPay`,
+  };
+}
+
+export function buildPasswordResetEmail(data: {
+  user: NotificationRecipient;
+  resetUrl: string;
+}): { subject: string; html: string; text: string } {
+  const subject = "Restablece tu contraseña de NexPay";
+  const firstName = data.user.full_name.split(" ")[0] || data.user.full_name;
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+  const resetUrl = escapeHtml(data.resetUrl);
+  const contentHtml = `
+    <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #eee2c0;">
+      Hola, ${escapeHtml(firstName)}
+    </h1>
+    <p style="margin: 0 0 18px; font-size: 15px; line-height: 1.6; color: #b3a888;">
+      Recibimos una solicitud para cambiar la contraseña de tu cuenta NexPay. Usa el siguiente enlace para crear una nueva:
+    </p>
+    <div style="text-align: center; margin-bottom: 24px;">
+      <a href="${resetUrl}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px;">
+        Cambiar mi contraseña
+      </a>
+    </div>
+    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #b3a888;">
+      El enlace vence en una hora y solo puede usarse una vez. Si no solicitaste este cambio, puedes ignorar este correo.
+    </p>
+  `;
+
+  return {
+    subject,
+    html: emailLayout(subject, contentHtml, data.user.theme),
+    text: `Hola, ${firstName}
+
+Recibimos una solicitud para cambiar la contraseña de tu cuenta NexPay. Visita este enlace para crear una nueva:
+${data.resetUrl}
+
+El enlace vence en una hora y solo puede usarse una vez. Si no solicitaste este cambio, puedes ignorar este correo.
+
+© ${new Date().getFullYear()} NexPay`,
+  };
+}
+
 /**
  * Limita los decimales a 2 al mostrar cualquier saldo o monto monetario en el correo.
  * Ejemplo: "1500000.4567" -> "1500000.46", "100" -> "100.00"
@@ -178,12 +260,8 @@ export function formatBalance(value: string | number | null | undefined, decimal
  * 2. Email de resumen de transacción (Compra / Venta / Intercambio)
  */
 export function buildExchangeEmail(data: ExchangeNotificationData): { subject: string; html: string; text: string } {
-  const typeLabels: Record<string, string> = {
-    BUY: "Compra de Divisa",
-    SELL: "Venta de Divisa",
-    EXCHANGE: "Intercambio de Monedas",
-  };
-  const operationTitle = typeLabels[data.type] ?? "Transacción";
+  // Compra, venta e intercambio son la misma operación para el usuario: un intercambio de balance.
+  const operationTitle = "Intercambio de balance";
   const subject = `Resumen de tu transacción: ${operationTitle} en NexPay`;
   const firstName = data.user.full_name.split(" ")[0] || data.user.full_name;
 
@@ -373,6 +451,150 @@ Esta recarga corresponde a saldo virtual de prueba (modo demo) en la plataforma 
   return {
     subject,
     html: emailLayout(subject, contentHtml, data.user.theme),
+    text,
+  };
+}
+
+/**
+ * 5. Emails del mercado P2P: oferta publicada, vendida, comprada, cancelada o vencida.
+ * Mismo diseño que el resumen de transacción. La otra parte se muestra solo con nombre e inicial.
+ */
+export function buildP2PEmail(data: P2PEmailData): { subject: string; html: string; text: string } {
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character] ?? character);
+
+  const firstName = data.user.full_name.split(" ")[0] || data.user.full_name;
+  const name = escapeHtml(firstName);
+  const sell = `${formatBalance(data.sell_amount, 2)} ${data.sell_currency}`;
+  const buy = `${formatBalance(data.buy_amount, 2)} ${data.buy_currency}`;
+  const rate = `1 ${data.sell_currency} = ${data.rate} ${data.buy_currency}`;
+  const counterpart = data.counterpart_name ? escapeHtml(data.counterpart_name) : "Otro usuario";
+  const expires = data.expires_at ? new Date(data.expires_at).toLocaleString("es-CO", { timeZone: "America/Bogota" }) : "";
+  const green = "font-size: 14px; font-weight: 700; color: #4cc38a;";
+  const mono = "font-size: 12px; font-family: monospace; color: #a09683;";
+  const grey = "background-color: #2a2a2a; color: #b3a888;";
+  const success = "background-color: #163326; color: #4cc38a;";
+
+  const copy: Record<P2PEmailEvent, { badge: string; badgeColors: string; subject: string; title: string; intro: string }> = {
+    published: {
+      badge: "Oferta publicada",
+      badgeColors: "background-color: #2e2410; color: #f2cf7a;",
+      subject: `Publicaste tu oferta P2P: ${sell}`,
+      title: `¡Tu oferta está en el mercado, ${name}!`,
+      intro: `Los <strong>${sell}</strong> quedaron retenidos en garantía hasta que alguien acepte, la canceles o venza.`,
+    },
+    sold: {
+      badge: "Oferta vendida",
+      badgeColors: success,
+      subject: `¡Vendiste ${sell} en el P2P de NexPay!`,
+      title: `¡Aceptaron tu oferta, ${name}!`,
+      intro: `${counterpart} aceptó tu oferta. El intercambio se hizo al instante y el dinero ya está en tu billetera.`,
+    },
+    bought: {
+      badge: "Compra P2P",
+      badgeColors: success,
+      subject: `Compraste ${formatBalance(data.receives ?? data.sell_amount, 2)} ${data.sell_currency} en el P2P de NexPay`,
+      title: `¡Intercambio exitoso, ${name}!`,
+      intro: `Aceptaste la oferta de ${counterpart}. El intercambio se hizo al instante y el dinero ya está en tu billetera.`,
+    },
+    cancelled: {
+      badge: "Oferta cancelada",
+      badgeColors: grey,
+      subject: `Cancelaste tu oferta P2P de ${sell}`,
+      title: `Oferta cancelada, ${name}`,
+      intro: `Los <strong>${sell}</strong> que estaban retenidos volvieron a tu saldo.`,
+    },
+    expired: {
+      badge: "Oferta vencida",
+      badgeColors: grey,
+      subject: `Tu oferta P2P de ${sell} venció`,
+      title: `Tu oferta venció, ${name}`,
+      intro: `Nadie la aceptó a tiempo. Los <strong>${sell}</strong> que estaban retenidos volvieron a tu saldo.`,
+    },
+  };
+  const c = copy[data.event];
+
+  const fee = data.fee_amount !== undefined && data.fee_currency
+    ? `${formatBalance(data.fee_amount, 2)} ${data.fee_currency} (${data.fee_percent}%)`
+    : `${data.fee_percent}% de lo que recibe cada parte`;
+
+  // [etiqueta, valor, estilo del valor (opcional)]
+  const rows: [string, string, string?][] = [];
+  if (data.event === "published") {
+    rows.push(["Vendes (retenido)", sell], ["Tasa de tu oferta", rate], ["El comprador paga", buy]);
+    if (data.seller_receives) rows.push(["Recibes si aceptan", `${formatBalance(data.seller_receives, 2)} ${data.buy_currency}`, green]);
+    rows.push(["Comisión NexPay", fee]);
+    if (expires) rows.push(["Vence", expires]);
+  } else if (data.event === "sold") {
+    rows.push(["Vendiste", sell], ["Tasa", rate], ["Comisión NexPay", fee]);
+    if (data.receives) rows.push(["Recibiste", `+${formatBalance(data.receives, 2)} ${data.buy_currency}`, green]);
+  } else if (data.event === "bought") {
+    rows.push(["Pagaste", buy], ["Tasa", rate], ["Comisión NexPay", fee]);
+    if (data.receives) rows.push(["Recibiste", `+${formatBalance(data.receives, 2)} ${data.sell_currency}`, green]);
+  } else {
+    rows.push(["Devuelto a tu saldo", `+${sell}`, green], ["Tasa de la oferta", rate]);
+  }
+  if (data.transaction_id) rows.push(["ID de Transacción", data.transaction_id, mono]);
+  rows.push(["ID de la oferta", data.offer_id, mono]);
+
+  const rowHtml = ([label, value, style = "font-size: 13px; font-weight: 600; color: #eee2c0;"]: [string, string, string?]) => `
+      <tr>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; font-size: 13px; color: #b3a888;">${label}</td>
+        <td style="padding: 12px 18px; border-bottom: 1px solid #3b3020; ${style} text-align: right;">${value}</td>
+      </tr>`;
+
+  const contentHtml = `
+    <div style="margin-bottom: 20px;">
+      <span style="display: inline-block; ${c.badgeColors} font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+        ${c.badge}
+      </span>
+    </div>
+
+    <h1 style="margin: 0 0 14px; font-size: 22px; font-weight: 700; color: #eee2c0;">${c.title}</h1>
+    <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #b3a888;">${c.intro}</p>
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0e0d0b; border: 1px solid #3b3020; border-radius: 12px; margin-bottom: 24px; overflow: hidden;">
+      ${rows.map(rowHtml).join("")}
+      <tr>
+        <td style="padding: 12px 18px; font-size: 13px; color: #b3a888;">Fecha y Hora</td>
+        <td style="padding: 12px 18px; font-size: 13px; color: #a09683; text-align: right;">
+          ${new Date(data.created_at).toLocaleString("es-CO", { timeZone: "America/Bogota" })}
+        </td>
+      </tr>
+    </table>
+
+    <div style="text-align: center; margin-bottom: 24px;">
+      <a href="${env.frontendAppUrl}" target="_blank" style="display: inline-block; background-color: #d4a64a; color: #1a1206; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 24px; border-radius: 8px;">
+        Ver en mi Billetera
+      </a>
+    </div>
+  `;
+
+  // Versión de texto: sin etiquetas HTML (la otra parte en texto plano, sin escapar).
+  const intro = c.intro
+    .replace(/<\/?strong>/g, "")
+    .replace(counterpart, data.counterpart_name ?? "Otro usuario");
+  const text = `Hola, ${firstName}.
+
+${intro}
+
+DETALLES:
+${rows.map(([label, value]) => `- ${label}: ${value}`).join("\n")}
+- Fecha: ${data.created_at}
+
+AVISO DE SIMULACIÓN:
+Este intercambio se hizo con dinero ficticio en el entorno de pruebas de NexPay. No involucra dinero real.
+
+© ${new Date().getFullYear()} NexPay`;
+
+  return {
+    subject: c.subject,
+    html: emailLayout(c.subject, contentHtml, data.user.theme),
     text,
   };
 }

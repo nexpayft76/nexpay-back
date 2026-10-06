@@ -93,14 +93,14 @@ export const updateMeSchema = z
 
 /** DELETE /api/users/me: la contraseña confirma que quien pide cerrar la cuenta es su dueño. */
 export const closeAccountSchema = z
-  .object({ password: z.string({ error: "La contraseña es obligatoria" }).min(1, "La contraseña es obligatoria") })
+  .object({ password: z.string().min(1, "La contraseña no puede estar vacía").optional() })
   .strict();
 
 export const validateUpdateMe = validateBody(updateMeSchema, "INVALID_PROFILE_PAYLOAD", "Datos del perfil inválidos");
 export const validateCloseAccount = validateBody(
   closeAccountSchema,
   "INVALID_CLOSE_ACCOUNT_PAYLOAD",
-  "Para cerrar la cuenta hay que enviar la contraseña",
+  "Los datos para cerrar la cuenta son inválidos",
 );
 
 /** PATCH /api/users/me/password: la contraseña actual confirma al dueño; la nueva sigue las reglas del registro. */

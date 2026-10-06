@@ -6,6 +6,9 @@ import {
   buildAlertEmail,
   buildDepositEmail,
   buildExchangeEmail,
+  buildP2PEmail,
+  buildPasswordChangedEmail,
+  buildPasswordResetEmail,
   buildWelcomeEmail,
 } from "./notifications.templates";
 import type {
@@ -14,6 +17,7 @@ import type {
   ExchangeNotificationData,
   NotificationEmailType,
   NotificationRecipient,
+  P2PEmailData,
 } from "./notifications.types";
 
 interface TrackedEmailInput {
@@ -100,6 +104,45 @@ export const notificationsService = {
     }
   },
 
+  async sendPasswordChangedEmail(user: NotificationRecipient): Promise<void> {
+    try {
+      const email = buildPasswordChangedEmail(await userWithSavedTheme(user));
+      await sendAndRecordEmail({
+        user,
+        email_type: "password_changed",
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      });
+    } catch (err) {
+      logger.error("Error al procesar el email de cambio de contraseña", {
+        error: err instanceof Error ? err.message : String(err),
+        email: user.email,
+      });
+    }
+  },
+
+  async sendPasswordResetEmail(data: { user: NotificationRecipient; resetUrl: string }): Promise<void> {
+    try {
+      const email = buildPasswordResetEmail({
+        ...data,
+        user: await userWithSavedTheme(data.user),
+      });
+      await sendAndRecordEmail({
+        user: data.user,
+        email_type: "password_reset",
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      });
+    } catch (err) {
+      logger.error("Error al procesar el email de restablecimiento de contraseña", {
+        error: err instanceof Error ? err.message : String(err),
+        email: data.user.email,
+      });
+    }
+  },
+
   /**
    * 2. Envía email con el resumen de la transacción realizada (compra, venta o intercambio).
    */
@@ -140,6 +183,29 @@ export const notificationsService = {
         error: err instanceof Error ? err.message : String(err),
         email: data.user.email,
         transactionId: data.transaction_id,
+      });
+    }
+  },
+
+  /**
+   * 5. Email del mercado P2P (oferta publicada, vendida, comprada, cancelada o vencida).
+   */
+  async sendP2PEmail(data: P2PEmailData): Promise<void> {
+    try {
+      const email = buildP2PEmail({ ...data, user: await userWithSavedTheme(data.user) });
+      await sendAndRecordEmail({
+        user: data.user,
+        email_type: "p2p",
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      });
+    } catch (err) {
+      logger.error("Error al procesar el email P2P", {
+        error: err instanceof Error ? err.message : String(err),
+        email: data.user.email,
+        offerId: data.offer_id,
+        event: data.event,
       });
     }
   },

@@ -5,7 +5,7 @@ export interface NotificationRecipient {
   theme?: "light" | "dark";
 }
 
-export type NotificationEmailType = "welcome" | "exchange" | "deposit" | "alert";
+export type NotificationEmailType = "welcome" | "exchange" | "deposit" | "alert" | "password_changed" | "password_reset" | "p2p";
 
 export interface WelcomeEmailData {
   user: NotificationRecipient;
@@ -33,6 +33,32 @@ export interface DepositNotificationData {
   amount: string;
   new_balance: string;
   transaction_id: string;
+  created_at: string;
+}
+
+/** Qué pasó con una oferta P2P (cada evento es un email distinto). */
+export type P2PEmailEvent = "published" | "sold" | "bought" | "cancelled" | "expired";
+
+export interface P2PEmailData {
+  user: NotificationRecipient;
+  event: P2PEmailEvent;
+  offer_id: string;
+  sell_currency: string;
+  buy_currency: string;
+  sell_amount: string;
+  buy_amount: string;
+  rate: number;
+  fee_percent: number;
+  /** Comisión y neto de quien recibe el email (vendedor o comprador). */
+  fee_amount?: string;
+  fee_currency?: string;
+  receives?: string;
+  /** Si publicó: lo que recibiría si aceptan. */
+  seller_receives?: string;
+  /** La otra parte, solo con nombre e inicial del apellido. */
+  counterpart_name?: string;
+  expires_at?: string;
+  transaction_id?: string | null;
   created_at: string;
 }
 
