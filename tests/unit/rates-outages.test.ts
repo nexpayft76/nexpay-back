@@ -119,4 +119,17 @@ describe("Rates: fallos y tasas desactualizadas", () => {
     assert.equal(snapshot.table.rates.COP, 4000);
     assert.match(snapshot.warnings[0] ?? "", /No hay ninguna tasa registrada para ARS/);
   });
+
+  it("responde 503 RATES_UNAVAILABLE si todos los proveedores fallan y no hay respaldo válido", async () => {
+    frankfurterDown = true;
+    dolarApiDown = true;
+
+    await assert.rejects(
+      getRateSnapshot(),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 503 &&
+        error.code === "RATES_UNAVAILABLE",
+    );
+  });
 });
