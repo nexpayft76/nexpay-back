@@ -68,6 +68,10 @@ describe("Rates: tasas cruzadas", () => {
   it("encuentra monedas activas y rechaza códigos no soportados", () => {
     assert.equal(assertSupported(currencies, "COP"), currencies[1]);
     assert.equal(errorCode(() => assertSupported(currencies, "EUR")), "UNSUPPORTED_CURRENCY");
+    assert.equal(
+      errorCode(() => assertSupported([{ ...currencies[1]!, is_active: false }], "COP")),
+      "UNSUPPORTED_CURRENCY",
+    );
   });
 });
 
