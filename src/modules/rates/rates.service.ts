@@ -177,7 +177,7 @@ export function crossRate(table: UsdRateTable, from: string, to: string): number
 }
 
 export function assertSupported(currencies: CurrencyRecord[], code: string): CurrencyRecord {
-  const currency = currencies.find((c) => c.code === code);
+  const currency = currencies.find((c) => c.code === code && c.is_active);
   if (!currency) {
     const supported = currencies.map((c) => c.code).join(", ");
     throw new AppError(400, "UNSUPPORTED_CURRENCY", `Moneda no soportada: ${code}. Disponibles: ${supported}`);
