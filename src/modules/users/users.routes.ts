@@ -27,8 +27,89 @@ import { requireSuperuser, requireAuth } from "../auth/auth.middlewares";
 
 export const usersRouter = Router();
 
+/**
+ * @openapi
+ * /api/users/me/theme:
+ *   get:
+ *     summary: Obtener mi tema de interfaz
+ *     tags: [Users]
+ *     responses:
+ *       200:
+ *         description: Tema actual del usuario autenticado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     theme: { type: string, enum: [light, dark] }
+ *       404: { description: Usuario no encontrado }
+ *   patch:
+ *     summary: Cambiar mi tema de interfaz
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [theme]
+ *             properties:
+ *               theme: { type: string, enum: [light, dark] }
+ *     responses:
+ *       200: { description: Tema actualizado }
+ *       400:
+ *         description: Tema inválido (INVALID_THEME)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       404: { description: Usuario no encontrado }
+ */
 usersRouter.get("/me/theme", requireAuth, getMyTheme);
 usersRouter.patch("/me/theme", requireAuth, validateTheme, updateMyTheme);
+
+/**
+ * @openapi
+ * /api/users/me/preferences:
+ *   get:
+ *     summary: Obtener mis preferencias
+ *     tags: [Users]
+ *     responses:
+ *       200:
+ *         description: Preferencias del usuario autenticado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     theme: { type: string, enum: [light, dark] }
+ *                     in_app_notifications: { type: boolean }
+ *                     email_notifications: { type: boolean }
+ *       404: { description: Usuario no encontrado }
+ *   patch:
+ *     summary: Actualizar mis preferencias
+ *     description: Se pueden enviar uno o más campos.
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               theme: { type: string, enum: [light, dark] }
+ *               in_app_notifications: { type: boolean }
+ *               email_notifications: { type: boolean }
+ *     responses:
+ *       200: { description: Preferencias actualizadas }
+ *       400:
+ *         description: Preferencias inválidas (INVALID_PREFERENCES)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       404: { description: Usuario no encontrado }
+ */
 usersRouter.get("/me/preferences", requireAuth, getMyPreferences);
 usersRouter.patch("/me/preferences", requireAuth, validatePreferences, updateMyPreferences);
 

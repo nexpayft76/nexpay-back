@@ -77,9 +77,24 @@ currenciesRouter.post("/", requireSuperuser, validateCreateCurrency, createCurre
  *         schema:
  *           type: string
  *         example: USD
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string, minLength: 2, maxLength: 80, example: "Dólar estadounidense" }
+ *               decimals: { type: integer, minimum: 0, maximum: 18, example: 2 }
+ *               is_active: { type: boolean }
  *     responses:
  *       200:
  *         description: Moneda actualizada
+ *       400:
+ *         description: Datos inválidos (INVALID_CURRENCY_PAYLOAD)
+ *         content: { application/json: { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+ *       404:
+ *         description: Moneda no encontrada
  *   delete:
  *     summary: Desactivar moneda
  *     tags: [Currencies]
